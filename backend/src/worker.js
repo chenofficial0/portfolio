@@ -11,7 +11,7 @@ const GITHUB_API="https://api.github.com";
 const utf8=new TextEncoder();
 const json=(body,status=200,extra={})=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",...extra}});
 const fail=(msg,status=400)=>json({error:msg},status);
-const b64=b=>btoa(String.fromCharCode(...b));
+const b64=b=>{let binary="";for(let i=0;i<b.length;i+=8192)binary+=String.fromCharCode(...b.subarray(i,i+8192));return btoa(binary)};
 const random=()=>b64url(crypto.getRandomValues(new Uint8Array(32)));
 const b64url=b=>b64(b).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const digest=async s=>b64url(new Uint8Array(await crypto.subtle.digest("SHA-256",utf8.encode(s))));
@@ -159,7 +159,7 @@ async function saveContent(request,session){
       })
     });
     return json({ok:true,sha:response.content?.sha||null,commit:response.commit?.sha||null});
-  }catch(e){return fail(e.http===409?"Website content was changed elsewhere; reload before publishing":"GitHub publish failed",e.http===409?409:502)}
+  }catch(e){return fail([409,422].includes(e.http)?"Website content may have changed; reload before publishing":"GitHub publish failed",[409,422].includes(e.http)?409:502)}
 }
 async function studio(env){
   const upstream=await fetch(PUBLIC_STUDIO,{headers:{"Cache-Control":"no-cache"}});
@@ -171,7 +171,7 @@ async function studio(env){
   return new Response(secured,{headers:{
     "content-type":"text/html; charset=utf-8","cache-control":"no-store",
     "x-frame-options":"DENY","x-content-type-options":"nosniff",
-    "content-security-policy":"default-src 'none'; script-src 'nonce-"+nonce+"'; style-src 'nonce-"+nonce+"'; connect-src 'self' https://chenofficial0.github.io; img-src 'self' data: https:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+    "content-security-policy":"default-src 'none'; script-src 'nonce-"+nonce+"'; style-src 'nonce-"+nonce+"'; style-src-attr 'unsafe-inline'; connect-src 'self' https://chenofficial0.github.io; img-src 'self' data: https:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
   }});
 }
 export default {
