@@ -70,7 +70,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     <div class="side-foot"><a href="../" target="_blank" rel="noopener">查看正式網站 ↗</a><a href="./">開啟原有 Decap 後台 ↗</a></div>
   </aside>
   <main class="content">
-    <header class="topbar"><span class="overline">CHEN. / WEBSITE MANAGEMENT</span><div class="top-actions"><button class="btn" id="import">匯入 JSON</button><button class="btn" id="export">匯出修改檔案</button><button class="btn dark" id="publish" hidden>發布至網站</button><button class="btn" id="login" hidden>使用 GitHub 登入</button><button class="btn" id="logout" hidden>登出</button></div></header>
+    <header class="topbar"><span class="overline">CHEN. / WEBSITE MANAGEMENT</span><div class="top-actions"><button class="btn" id="import">匯入 JSON</button><button class="btn" id="export">匯出修改檔案</button><button class="btn dark" id="publish" hidden>儲存草稿</button><button class="btn" id="login" hidden>使用 GitHub 登入</button><button class="btn" id="logout" hidden>登出</button></div></header>
     <section class="hero"><div class="overline" id="page-tag">OVERVIEW</div><h1 id="page-title">網站管理總覽</h1><p id="page-description">管理 CHEN. 官方網站內容。這是客製化後台第一階段，可編輯資料並匯出 JSON；尚未連接安全發布服務。</p></section>
     <div class="notice" id="auth-notice" role="status"><strong>預覽模式。</strong> 目前未連接已部署的安全服務。可編輯並匯出 JSON；內容不會自動發布。請勿在此輸入密碼或 GitHub Token。</div>
     <div id="view"></div>
@@ -391,8 +391,8 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
         const session=await response.json();
         if(session.authenticated){
           apiSession=session;
-          publish.hidden=!session.canPublish;logout.hidden=false;
-          notice.textContent="已透過 GitHub 登入："+session.login+"。"+(session.canPublish?"發布功能已由伺服器啟用，發布前請確認資料可公開。":"目前為安全測試模式：正式發布功能仍停用。可編輯及匯出 JSON 備份。");
+          publish.hidden=!session.canSave;logout.hidden=false;
+          notice.textContent="已透過 GitHub 登入："+session.login+"。"+(session.canSave?"已開放儲存至 GitHub 測試分支。測試照片會存於公開儲存庫，但不會立即顯示於正式網站。":"目前為安全測試模式：尚未開放儲存草稿。可編輯及匯出 JSON 備份。");
           const contentResponse=await fetch("/api/content",{credentials:"same-origin",cache:"no-store"});
           if(!contentResponse.ok)throw Error("無法讀取網站的最新資料");
           const payload=await contentResponse.json();data=norm(payload.data);contentSha=payload.sha;
@@ -419,9 +419,9 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     changed=false;location.href="/studio";
   });
   publish.addEventListener("click",async()=>{
-    if(!apiSession||!contentSha)return alert("請先完成 GitHub 安全登入");
-    if(!confirm("確定要將目前內容發布至正式網站？網站資料將公開顯示。"))return;
-    publish.disabled=true;publish.textContent="發布中…";
+    if(!apiSession?.canSave||!contentSha)return alert("目前尚未開放儲存草稿");
+    if(!confirm("確定要將目前資料儲存至 GitHub 測試分支？不會更新正式網站。"))return;
+    publish.disabled=true;publish.textContent="儲存中…";
     try{
       const response=await fetch("/api/content",{
         method:"PUT",credentials:"same-origin",
@@ -431,9 +431,9 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       const result=await response.json();
       if(!response.ok)throw Error(result.error||"發布失敗");
       contentSha=result.sha;changed=false;document.title="CHEN. | Content Studio";
-      alert("已提交至 GitHub。GitHub Pages 部署完成後會更新正式網站。");
+      alert("草稿已儲存到 GitHub 測試分支，正式網站尚未更新。");
     }catch(error){alert("未能發布："+error.message+"。若內容已在其他地方修改，請先匯出備份，重新整理取得最新版本。")}
-    finally{publish.disabled=false;publish.textContent="發布至網站"}
+    finally{publish.disabled=false;publish.textContent="儲存草稿"}
   });
   renderMain();start();
 })();
