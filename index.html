@@ -107,6 +107,7 @@
 .hero-images .hero-visual img{display:block;width:100%;height:100%;object-fit:contain;object-position:left top;transform:none}
 .hero-images .hero-visual.hero-empty,.hero-images .hero-visual.has-photo{background:transparent}
 .hero-images .hero-secondary:not(.has-photo){display:none}
+.hero-images .hero-visual.has-photo .visual-note{display:none!important}
 .comp-card-photo.has-photo,.work-thumb:has(img),.cms-gallery img,.gallery-grid img,.detail-img,.detail-gallery img{background:transparent}
 .hero-copy{width:min(100%,660px)}
 .comp-card-photo img,.work-thumb img,.gallery-grid img,.cms-gallery img,.detail-img,.detail-gallery img{object-fit:contain}
@@ -370,7 +371,7 @@
     const box=document.querySelector(selector);if(!box)return;
     const old=box.querySelector('img');if(old)old.remove();
     box.classList.toggle('has-photo',Boolean(safeFile(url)));
-    const placeholder=box.querySelector('[data-i18n]');if(placeholder)placeholder.hidden=Boolean(safeFile(url));
+    const placeholder=box.querySelector('.visual-note');if(placeholder)placeholder.hidden=Boolean(safeFile(url));
     if(safeFile(url)){const img=document.createElement('img');img.src=url;img.alt=alt;img.loading=selector.includes('hero')?'eager':'lazy';if(box.closest('.hero-images'))img.addEventListener('load',resizeHeroPortraits);box.prepend(img)}
     if(box.closest('.hero-images'))resizeHeroPortraits();
   };
