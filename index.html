@@ -453,20 +453,34 @@
       buttons.replaceChildren();
       const opts=[['model_card_pdf','modelCardAction','pdf'],['resume_pdf','resumeAction','pdf'],['showreel_url','showreelAction','url']];
       for(const [field,label,type] of opts){
-        const url=p[field];let node;
-        if(safeFile(url)){
-          if(type==='pdf'){node=setArrowLabel(el('button','comp-card-button'),i18n(label));node.type='button';node.addEventListener('click',()=>{
+        const url=p[field];
+        if(!safeFile(url))continue;
+        let node;
+        if(type==='pdf'){
+          node=setArrowLabel(el('button','comp-card-button'),i18n(label));
+          node.type='button';
+          node.addEventListener('click',()=>{
             const frame=document.getElementById('pdf-frame'),external=document.getElementById('pdf-external'),dialog=document.getElementById('pdf-dialog');
             if(!frame||!external||!dialog)return;
             frame.src=url;external.href=url;dialog.showModal();
-          });}
-          else{node=setArrowLabel(el('a','comp-card-button'),i18n(label));node.href=url;node.target='_blank';node.rel='noopener noreferrer';}
-        }else node=setArrowLabel(el('span','comp-card-button pending'),i18n(label));
+          });
+        }else{
+          node=setArrowLabel(el('a','comp-card-button'),i18n(label));
+          node.href=url;node.target='_blank';node.rel='noopener noreferrer';
+        }
         buttons.append(node);
+      }
+      if(Array.isArray(p.links)){
+        for(const item of p.links.slice(0,30)){
+          if(!item||typeof item.label!=='string'||!item.label.trim()||!safeFile(item.url))continue;
+          const label=String(item['label_'+language]||item.label||'').trim();
+          const link=setArrowLabel(el('a','comp-card-button'),label);
+          link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';buttons.append(link);
+        }
       }
     }
     const pending=document.querySelector('.comp-card-note');
-    if(pending)pending.hidden=Boolean([p.model_card_pdf,p.resume_pdf,p.showreel_url].every(safeFile));
+    if(pending)pending.hidden=true;
     const contacts=document.querySelector('.contact-links');
     if(contacts){
       contacts.replaceChildren();
