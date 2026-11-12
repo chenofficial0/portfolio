@@ -28,7 +28,13 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .field{min-width:0;display:flex;flex-direction:column;gap:7px}.field.full{grid-column:1/-1}
 .field label{font-size:11px;color:#777}.field input,.field textarea,.field select{width:100%;border:1px solid #dddcd7;background:white;border-radius:0;padding:11px 12px;color:#1b1b1b;min-height:43px}
 .field textarea{min-height:114px;resize:vertical;line-height:1.7}
-.field small{font-size:10px;color:#aaa}.checkline{display:flex;align-items:center;gap:9px;font-size:12px}.checkline input{width:15px;height:15px}
+.field small{font-size:10px;color:#aaa}
+.photo-uploader{border:1px solid var(--line);padding:18px;background:var(--soft);display:grid;gap:13px}
+.photo-uploader img{width:min(100%,380px);max-height:400px;object-fit:contain;background:#eee}
+.photo-uploader .upload-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.photo-uploader .upload-status{font-size:11px;color:#666;white-space:pre-wrap;overflow-wrap:anywhere}
+.photo-uploader button:disabled{opacity:.5;cursor:not-allowed}
+.checkline{display:flex;align-items:center;gap:9px;font-size:12px}.checkline input{width:15px;height:15px}
 .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
 .metric{padding:19px;border:1px solid var(--line);min-height:98px}.metric strong{display:block;font-size:28px;font-weight:400}.metric span{display:block;color:#999;font-size:10px;margin-top:7px}
 .collection{display:grid;gap:11px}.entry{border:1px solid var(--line);padding:16px;display:flex;gap:15px;align-items:center;justify-content:space-between}.entry-info{min-width:0}.entry-title{font-weight:500;font-size:13px;overflow-wrap:anywhere}.entry-sub{font-size:10px;color:#929292;margin-top:3px}.entry-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -85,7 +91,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     ["name_zh","中文姓名"],["name_en","英文姓名"],["name_ko","韓文姓名"],
     ["birth_year","出生年份","number"],["show_birth_year","公開出生年份","checkbox"],["based_in","所屬地區"],
     ["languages","語言能力（以逗號分隔）","languages"],
-    ["hero_image","首頁形象照片路徑或網址"],
+    ["hero_image","首頁形象照片","heroImage"],
     ["bio_zh","中文簡介","textarea"],["bio_en","英文簡介","textarea"],["bio_ko","韓文簡介","textarea"]
   ];
   const profileFields=[
@@ -121,8 +127,91 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     gallery:Array.isArray(d.gallery)?d.gallery:[],
     contact:(d.contact && typeof d.contact==="object"&&!Array.isArray(d.contact))?d.contact:{}
   });
+  // Image input is local-preview only until an authenticated, tested upload endpoint is enabled.
+  async function compressPhoto(file){
+    if(!["image/jpeg","image/png","image/webp"].includes(file.type))throw Error("只支援 JPG、PNG、WebP");
+    if(file.size>10*1024*1024)throw Error("請選擇小於 10 MB 的照片");
+    const objectURL=URL.createObjectURL(file);
+    let image;
+    try{image=await createImageBitmap(file)}finally{URL.revokeObjectURL(objectURL)}
+    try{
+      const maxSide=2000,ratio=Math.min(1,maxSide/Math.max(image.width,image.height));
+      const canvas=document.createElement("canvas");
+      canvas.width=Math.max(1,Math.round(image.width*ratio));
+      canvas.height=Math.max(1,Math.round(image.height*ratio));
+      const ctx=canvas.getContext("2d");
+      if(!ctx)throw Error("瀏覽器無法處理圖片");
+      ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(image,0,0,canvas.width,canvas.height);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.82));
+      if(!blob||blob.size>1.5*1024*1024)throw Error("照片處理後仍超過上傳限制，請先壓縮");
+      return blob;
+    }finally{image.close?.()}
+  }
+  function createHeroImageEditor(obj){
+    const wrap=el("div","field full"),label=el("label","","首頁形象照片");
+    wrap.append(label);
+    const panel=el("div","photo-uploader"),preview=document.createElement("img");
+    preview.alt="首頁形象照片預覽";preview.hidden=true;
+    const actions=el("div","upload-actions");
+    const pick=btn("選擇照片",()=>input.click());
+    const upload=btn("上傳至 GitHub",async()=>{
+      if(!pendingPhoto||!apiSession?.canUpload)return;
+      if(!confirm("確定上傳這張照片至 GitHub 測試分支？上傳後的照片會成為公開儲存庫檔案，請確認有公開權利。"))return;
+      upload.disabled=true;state.textContent="上傳中…";
+      try{
+        const base64=await new Promise((resolve,reject)=>{
+          const reader=new FileReader();
+          reader.onload=()=>resolve(String(reader.result).split(",")[1]);
+          reader.onerror=()=>reject(Error("無法讀取圖片"));
+          reader.readAsDataURL(pendingPhoto);
+        });
+        const response=await fetch("/api/media/hero",{method:"POST",credentials:"same-origin",
+          headers:{"content-type":"application/json","x-chen-csrf":apiSession.csrf},
+          body:JSON.stringify({filename:"hero.jpg",mime:"image/jpeg",base64})});
+        const result=await response.json();
+        if(!response.ok)throw Error(result.error||"圖片上傳失敗");
+        obj.hero_image=result.url;
+        pathInput.value=result.url;markDirty();
+        state.textContent="照片已上傳到測試分支。請注意：尚未發布到正式網站，僅供測試。";
+      }catch(err){state.textContent="無法上傳："+err.message}
+      finally{upload.disabled=!apiSession?.canUpload}
+    },"btn dark");
+    upload.disabled=true;
+    const input=document.createElement("input");
+    input.type="file";input.accept="image/jpeg,image/png,image/webp";
+    input.hidden=true;
+    const state=el("div","upload-status","目前可選擇本機照片預覽。安全測試模式下不會自動上傳或儲存。");
+    const pathInput=document.createElement("input");
+    pathInput.type="text";pathInput.value=obj.hero_image||"";pathInput.placeholder="已上傳照片網址（可選填）";
+    pathInput.setAttribute("aria-label","首頁形象照片網址");
+    const pathHint=el("small","","照片上傳後，這裡會自動填入網址；本機預覽不會修改正式網站。");
+    let pendingPhoto=null,localURL=null;
+    if(obj.hero_image){preview.src=obj.hero_image;preview.hidden=false}
+    input.addEventListener("change",async()=>{
+      const file=input.files?.[0];if(!file)return;
+      try{
+        const blob=await compressPhoto(file);
+        if(localURL)URL.revokeObjectURL(localURL);
+        localURL=URL.createObjectURL(blob);preview.src=localURL;preview.hidden=false;
+        pendingPhoto=blob;upload.disabled=!apiSession?.canUpload;
+        state.textContent="本機預覽完成："+(blob.size/1024).toFixed(0)+" KB。"+(apiSession?.canUpload?"可上傳到測試分支。":"目前未開放伺服器上傳，不會修改 GitHub。");
+      }catch(err){state.textContent=err.message;pendingPhoto=null;upload.disabled=true}
+      input.value="";
+    });
+    pathInput.addEventListener("input",()=>{
+      obj.hero_image=pathInput.value.trim();markDirty();
+      if(localURL){URL.revokeObjectURL(localURL);localURL=null;pendingPhoto=null;upload.disabled=true}
+      if(obj.hero_image){preview.src=obj.hero_image;preview.hidden=false}
+      else{preview.removeAttribute("src");preview.hidden=true}
+    });
+    actions.append(pick,upload);
+    panel.append(preview,actions,input,state,pathHint,pathInput);
+    wrap.append(panel);return wrap;
+  }
   function fieldRow(obj,f){
-    const [key,label,type]=f;const wrapper=el("div","field"+(type==="textarea"?" full":""));
+    const [key,label,type]=f;if(type==="heroImage")return createHeroImageEditor(obj);
+    const wrapper=el("div","field"+(type==="textarea"?" full":""));
     let input;
     if(type==="checkbox"){
       wrapper.className="field full";
