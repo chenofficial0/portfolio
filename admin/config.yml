@@ -2,11 +2,9 @@
 # GitHub Pages can host /admin/ but GitHub OAuth needs a separate provider.
 # Once an OAuth proxy has been configured, add backend.base_url and auth_endpoint.
 backend:
-  name: github
-  repo: chenofficial0/portfolio
+  name: turbo-github
+  turbo_site_id: ea730e21-1da5-4c6d-895f-41afb0e2519e
   branch: main
-# base_url: https://YOUR-OAUTH-PROXY.example
-# auth_endpoint: auth
 
 site_url: https://chenofficial0.github.io/portfolio/
 display_url: https://chenofficial0.github.io/portfolio/
