@@ -34,6 +34,13 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .photo-uploader .upload-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
 .photo-uploader .upload-status{font-size:11px;color:#666;white-space:pre-wrap;overflow-wrap:anywhere}
 .photo-uploader button:disabled{opacity:.5;cursor:not-allowed}
+.release-review{border:1px solid var(--line);padding:22px;background:#fff;display:grid;gap:12px;margin-bottom:28px}
+.release-review h2{font-size:15px;font-weight:500;margin:0}
+.release-review p{font-size:12px;color:#666;margin:0}
+.release-review ul{padding-left:20px;color:#555;margin:0}
+.release-review .toolbar{justify-content:flex-start}
+.release-review [data-release-status]{font-size:11px;color:#777}
+
 .photo-uploader .upload-status{line-height:1.8}
 .photo-stills{grid-column:1/-1;display:grid;gap:15px}
 .still-entry{border:1px solid var(--line);padding:18px;display:grid;gap:12px}
@@ -70,10 +77,10 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     <div class="side-foot"><a href="../" target="_blank" rel="noopener">查看正式網站 ↗</a><a href="./">開啟原有 Decap 後台 ↗</a></div>
   </aside>
   <main class="content">
-    <header class="topbar"><span class="overline">CHEN. / WEBSITE MANAGEMENT</span><div class="top-actions"><button class="btn" id="import">匯入 JSON</button><button class="btn" id="export">匯出修改檔案</button><button class="btn dark" id="publish" hidden>儲存草稿</button><button class="btn" id="login" hidden>使用 GitHub 登入</button><button class="btn" id="logout" hidden>登出</button></div></header>
+    <header class="topbar"><span class="overline">CHEN. / WEBSITE MANAGEMENT</span><div class="top-actions"><button class="btn" id="import">匯入 JSON</button><button class="btn" id="export">匯出修改檔案</button><button class="btn dark" id="publish" hidden>儲存草稿</button><button class="btn" id="preview-site" hidden>預覽網站</button><button class="btn" id="review-release" hidden>正式發布檢查</button><button class="btn" id="login" hidden>使用 GitHub 登入</button><button class="btn" id="logout" hidden>登出</button></div></header>
     <section class="hero"><div class="overline" id="page-tag">OVERVIEW</div><h1 id="page-title">網站管理總覽</h1><p id="page-description">管理 CHEN. 官方網站內容。這是客製化後台第一階段，可編輯資料並匯出 JSON；尚未連接安全發布服務。</p></section>
     <div class="notice" id="auth-notice" role="status"><strong>預覽模式。</strong> 目前未連接已部署的安全服務。可編輯並匯出 JSON；內容不會自動發布。請勿在此輸入密碼或 GitHub Token。</div>
-    <div id="view"></div>
+    <section class="release-review" id="release-review-panel" hidden></section><div id="view"></div>
     <footer>CHEN. CONTENT STUDIO · FIRST STAGE · NO AUTHENTICATED PUBLISHING</footer>
   </main>
 </div>
@@ -97,7 +104,8 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     ["name_zh","中文姓名"],["name_en","英文姓名"],["name_ko","韓文姓名"],
     ["birth_year","出生年份","number"],["show_birth_year","公開出生年份","checkbox"],["based_in","所屬地區"],
     ["languages","語言能力（以逗號分隔）","languages"],
-    ["hero_image","首頁形象照片","photo"],
+    ["hero_image","首頁主要照片（電腦及手機）","photo"],
+    ["hero_image_secondary","首頁次要照片（僅電腦版顯示）","photo"],
     ["bio_zh","中文簡介","textarea"],["bio_en","英文簡介","textarea"],["bio_ko","韓文簡介","textarea"]
   ];
   const profileFields=[
@@ -393,6 +401,56 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
   window.addEventListener("beforeunload",event=>{if(changed){event.preventDefault();event.returnValue=""}});
   const notice=document.getElementById("auth-notice");
   const login=document.getElementById("login"),logout=document.getElementById("logout"),publish=document.getElementById("publish");
+  const previewButton=document.getElementById("preview-site"),reviewButton=document.getElementById("review-release");
+  const reviewPanel=document.getElementById("release-review-panel");
+  let approvedPlanId=null;
+  previewButton.addEventListener("click",()=>{
+    if(changed && !confirm("有尚未儲存的編輯內容。預覽會顯示 GitHub 測試分支最後儲存的草稿，仍要開啟嗎？"))return;
+    window.open("/preview","_blank","noopener,noreferrer");
+  });
+  reviewButton.addEventListener("click",async()=>{
+    approvedPlanId=null;reviewPanel.hidden=false;reviewPanel.replaceChildren();
+    reviewPanel.append(el("h2","","發布前檢查"),el("p","","正在比對已儲存的 GitHub 草稿與正式網站…"));
+    if(changed){reviewPanel.append(el("p","","你目前有尚未儲存的編輯內容。請先使用「儲存草稿」，再重新檢查。"));return}
+    try{
+      const response=await fetch("/api/publish/plan",{credentials:"same-origin",cache:"no-store"});
+      const plan=await response.json();
+      if(!response.ok)throw Error(plan.error||"無法比對資料");
+      approvedPlanId=plan.planId;
+      reviewPanel.replaceChildren(el("h2","","正式發布檢查"));
+      reviewPanel.append(el("p","","此次發布將以 GitHub 測試分支的最新草稿為準，照片和網站資料會在一次 GitHub 提交中同步。"));
+      reviewPanel.append(el("p","","異動內容："+(plan.sections.length?plan.sections.join("、"):"無內容變更")+"。"));
+      reviewPanel.append(el("p","","照片檔案數："+plan.mediaCount+"。圖片一旦發布至正式網站，即可能被搜尋引擎存取。"));
+      if(plan.media.length){
+        const list=el("ul");for(const path of plan.media)list.append(el("li","",path));
+        reviewPanel.append(list);
+      }
+      const status=el("p","",plan.canPublish?"正式發布已開放。請先預覽並確認所有個人資訊與照片。":"目前仍處於安全測試階段：已可檢查發布內容，但正式發布尚未開放。");
+      reviewPanel.append(status);
+      const actions=el("div","toolbar");
+      actions.append(btn("預覽草稿",()=>window.open("/preview","_blank","noopener,noreferrer")));
+      if(plan.canPublish && plan.changed){
+        actions.append(btn("確認發布正式網站",async()=>{
+          if(!approvedPlanId)return;
+          if(!confirm("最後確認：是否將已儲存草稿與照片同步到正式 CHEN. 官方網站？此操作會建立 GitHub main 提交並公開內容。"))return;
+          const finalInput=prompt('請輸入 PUBLISH 以確認正式發布（英文大寫）');
+          if(finalInput!=="PUBLISH")return;
+          const candidate=approvedPlanId;approvedPlanId=null;
+          try{
+            const res=await fetch("/api/publish/confirm",{
+              method:"POST",credentials:"same-origin",
+              headers:{"content-type":"application/json","x-chen-csrf":apiSession.csrf},
+              body:JSON.stringify({planId:candidate,confirmation:"PUBLISH"})
+            });
+            const result=await res.json();
+            if(!res.ok)throw Error(result.error||"發布失敗");
+            reviewPanel.replaceChildren(el("h2","","已提交正式網站更新"),el("p","","GitHub Commit："+result.commit+"。GitHub Pages 更新顯示可能稍有延遲。"));
+          }catch(err){reviewPanel.append(el("p","","未完成發布："+err.message+"。請重新執行發布前檢查。"))}
+        },"btn dark"));
+      }
+      reviewPanel.append(actions);
+    }catch(err){reviewPanel.replaceChildren(el("h2","","無法完成發布檢查"),el("p","",err.message))}
+  });
   async function start(){
     if(isWorkerHost){
       try{
@@ -401,7 +459,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
         const session=await response.json();
         if(session.authenticated){
           apiSession=session;
-          publish.hidden=!session.canSave;logout.hidden=false;
+          publish.hidden=!session.canSave;logout.hidden=false;previewButton.hidden=false;reviewButton.hidden=false;
           notice.textContent="已透過 GitHub 登入："+session.login+"。"+(session.canSave?"已開放儲存至 GitHub 測試分支。測試照片會存於公開儲存庫，但不會立即顯示於正式網站。":"目前為安全測試模式：尚未開放儲存草稿。可編輯及匯出 JSON 備份。");
           const contentResponse=await fetch("/api/content",{credentials:"same-origin",cache:"no-store"});
           if(!contentResponse.ok)throw Error("無法讀取網站的最新資料");
