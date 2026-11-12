@@ -285,7 +285,7 @@
     <div id="work-dialog-body"></div>
   </dialog>
   <dialog id="pdf-dialog" class="pdf-dialog" aria-label="PDF preview">
-    <div class="pdf-toolbar"><strong>PDF PREVIEW</strong><a id="pdf-external" href="#" target="_blank" rel="noopener" data-i18n="openPdf">OPEN PDF</a><button type="button" data-close aria-label="Close">×</button></div>
+    <div class="pdf-toolbar"><strong>PDF PREVIEW</strong><a id="pdf-download" href="#" download="CHEN-document.pdf">下載 PDF</a><a id="pdf-external" href="#" target="_blank" rel="noopener" data-i18n="openPdf">OPEN PDF</a><button type="button" data-close aria-label="Close">×</button></div>
     <iframe id="pdf-frame" title="Model card / actor profile PDF"></iframe>
     <p class="pdf-fallback" data-i18n="pdfFallback">If your device cannot display the PDF, use OPEN PDF.</p>
   </dialog>
@@ -536,9 +536,9 @@
           node=setArrowLabel(el('button','comp-card-button'),i18n(label));
           node.type='button';
           node.addEventListener('click',()=>{
-            const frame=document.getElementById('pdf-frame'),external=document.getElementById('pdf-external'),dialog=document.getElementById('pdf-dialog');
-            if(!frame||!external||!dialog)return;
-            frame.src=url;external.href=url;dialog.showModal();
+            const frame=document.getElementById('pdf-frame'),external=document.getElementById('pdf-external'),download=document.getElementById('pdf-download'),dialog=document.getElementById('pdf-dialog');
+            if(!frame||!external||!download||!dialog)return;
+            frame.src=url;external.href=url;download.href=url;download.download='CHEN-'+field+'.pdf';dialog.showModal();
           });
         }else{
           node=setArrowLabel(el('a','comp-card-button'),i18n(label));
