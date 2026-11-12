@@ -117,6 +117,7 @@
   .hero-images .hero-secondary{display:none!important}
   .hero-images .hero-visual{max-width:100%;aspect-ratio:auto}
 }
+.hero .name-roman-ko{font-size:12px;line-height:1.7;letter-spacing:.035em;margin:2px 0 0;white-space:normal;overflow-wrap:anywhere}
 </style>
   
 </head>
@@ -147,8 +148,7 @@
       <div class="hero-copy">
         <span class="eyebrow">ARTIST — TAIWAN</span>
         <h1>姜翊</h1>
-        <p class="latin-name">CHIANG YI</p>
-        <p class="korean-name">강익</p>
+        <p class="name-roman-ko">CHIANG YI．강익</p>
         <a class="quiet-link" href="#filmography"><span data-i18n="viewWork">VIEW WORK</span> <svg class="link-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
       </div>
     </section>
@@ -193,7 +193,7 @@
           <div class="comp-card-content">
             <p class="comp-card-kicker">ARTIST INFORMATION</p>
             <h3 class="comp-card-name">姜翊</h3>
-            <p class="comp-card-names">CHIANG YI · 강익</p>
+            <p class="comp-card-names">CHIANG YI．강익</p>
             <dl class="comp-card-facts">
               <div><dt data-i18n="profileLocation">所在地</dt><dd>TAIWAN</dd></div>
               <div><dt data-i18n="profileLanguages">語言</dt><dd data-i18n="profileLanguagesValue">中文 / English / 한국어</dd></div>
@@ -381,10 +381,9 @@
     about=a;
     const name=choose(a,'name')||'姜翊';
     setText('.hero h1',name);
-    setText('.hero .latin-name',a.name_en||'');
-    setText('.hero .korean-name',a.name_ko||'');
+    setText('.hero .name-roman-ko',[a.name_en,a.name_ko].filter(Boolean).join('．'));
     setText('.comp-card-name',name);
-    setText('.comp-card-names',[a.name_en,a.name_ko].filter(Boolean).join(' · '));
+    setText('.comp-card-names',[a.name_en,a.name_ko].filter(Boolean).join('．'));
     setText('.hero .eyebrow','ARTIST — '+(a.based_in||'TAIWAN'));
     setText('.facts > div:nth-child(2) dd',a.based_in||'');
     setText('.facts > div:nth-child(3) dd',(a.languages||[]).join(' / '));
