@@ -124,7 +124,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     ["skills_zh","專長（中文）"],["skills_en","專長（英文）"],["skills_ko","專長（韓文）"],
     ["model_card_pdf","模特卡 PDF 路徑"],["resume_pdf","演員履歷 PDF 路徑"],["showreel_url","演出影片連結"]
   ];
-  const contactFields=[["email","工作信箱","email"],["instagram","Instagram 連結"],["other_url","其他社群連結（舊欄位，保留相容）"]];
+  const contactFields=[["email","工作信箱","email"],["instagram","Instagram 連結"]];
   const workFields=[
     ["title_zh","作品名稱（中文）"],["title_en","作品名稱（英文）"],["title_ko","作品名稱（韓文）"],
     ["year","年份","number"],["production","製作公司 / 品牌"],
@@ -360,7 +360,10 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       const defs=current==="about"?aboutFields:current==="profile"?profileFields:contactFields;
       const p=panel(d[1],"資料變更不會自動發布");
       fields(p,data[current],defs);
-      if(current==="contact")p.append(contactLinkEditor());
+      if(current==="contact"){
+        p.append(contactLinkEditor());
+        if(data.contact.other_url)p.append(fieldRow(data.contact,["other_url","既有其他社群連結（舊欄位）"]));
+      }
       const t=el("div","toolbar");t.style.marginTop="25px";t.append(el("span","toolbar-note","編輯完成後請匯出 JSON，備份你的修改。"),btn("匯出修改檔案",exportJSON));p.append(t);view.append(p);return;
     }
     renderCollection();
