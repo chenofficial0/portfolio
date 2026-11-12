@@ -43,7 +43,7 @@
 .comp-card-name{font-size:20px;line-height:1.5;font-weight:400;letter-spacing:.04em;margin:0 0 2px}
 .comp-card-names{font-size:12px;letter-spacing:.06em;color:#777;margin:0 0 23px}
 .comp-card-facts{margin:0 0 26px}
-.comp-card-facts>div{display:grid;grid-template-columns:115px 1fr;gap:12px;padding:7px 0}
+.comp-card-facts>div[hidden]{display:none}.comp-card-facts>div{display:grid;grid-template-columns:115px 1fr;gap:12px;padding:7px 0}
 .comp-card-facts dt{font-size:11px;color:#999}
 .comp-card-facts dd{margin:0;font-size:12px;color:#333;overflow-wrap:anywhere}
 .comp-card-actions{display:flex;flex-wrap:wrap;gap:10px}
@@ -301,7 +301,7 @@
     setText('.comp-card-facts > div:nth-child(1) dd',a.based_in||'');
     setText('.comp-card-facts > div:nth-child(2) dd',language==='en'?'Mandarin / English / Korean':language==='ko'?'중국어 / 영어 / 한국어':(a.languages||[]).join(' / '));
     const heightValue=String(p.height||'').trim();
-    setText('.comp-card-facts > div:nth-child(3) dd',heightValue ? (/^\\d+(?:\\.\\d+)?$/.test(heightValue) ? heightValue+' cm' : heightValue) : i18n('toAdd'));
+    setText('.comp-card-facts > div:nth-child(3) dd',heightValue ? (/^\d+(?:\.\d+)?$/.test(heightValue) ? heightValue+' cm' : heightValue) : i18n('toAdd'));
     const profileOptional={
       weight:p.weight,
       bust:p.bust,
@@ -317,7 +317,7 @@
       const val=String(rawValue??'').trim();
       row.hidden=!val;
       if(val){
-        const unit=(['weight','bust','waist','hips'].includes(key)&&/^\\d+(?:\\.\\d+)?$/.test(val))?(key==='weight'?' kg':' cm'):'';
+        const unit=(['weight','bust','waist','hips'].includes(key)&&/^\d+(?:\.\d+)?$/.test(val))?(key==='weight'?' kg':' cm'):'';
         setText('[data-profile-row="'+key+'"] dd',val+unit);
       }
     }
