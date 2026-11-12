@@ -29,6 +29,14 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .field label{font-size:11px;color:#777}.field input,.field textarea,.field select{width:100%;border:1px solid #dddcd7;background:white;border-radius:0;padding:11px 12px;color:#1b1b1b;min-height:43px}
 .field textarea{min-height:114px;resize:vertical;line-height:1.7}
 .field small{font-size:10px;color:#aaa}
+.translated-field{grid-column:1/-1;border:1px solid var(--line);padding:17px 18px;min-width:0}
+.translated-field-title{font-size:12px;font-weight:600;margin-bottom:12px}
+.translated-tabs{display:flex;gap:18px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:15px}
+.translated-tab{background:transparent;color:#999;border:0;border-bottom:1px solid transparent;padding:0 0 9px;cursor:pointer;font-size:11px}
+.translated-tab.active{color:var(--ink);border-bottom-color:var(--ink)}
+.translated-panel .field{max-width:100%}
+.translated-panel .field label{font-size:10px}
+.translated-panel[hidden]{display:none}
 .photo-uploader{border:1px solid var(--line);padding:18px;background:var(--soft);display:grid;gap:13px}
 .photo-uploader img{width:min(100%,380px);max-height:400px;object-fit:contain;background:#eee}
 .photo-uploader .upload-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
@@ -327,7 +335,56 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     });
     return wrapper;
   }
-  function fields(container,obj,defs){const grid=el("div","form-grid");defs.forEach(f=>grid.append(fieldRow(obj,f)));container.append(grid)}
+  // Group translated fields by meaning instead of rendering three near-identical rows.
+  // All existing _zh/_en/_ko JSON keys remain untouched.
+  function translatedField(obj,group){
+    const wrap=el("section","translated-field");
+    const title=el("div","translated-field-title",group[0][1].replace(/（(?:中文|英文|韓文)）/g,""));
+    const tabs=el("div","translated-tabs");
+    tabs.setAttribute("role","group");tabs.setAttribute("aria-label",title.textContent+" 語言切換");
+    const content=el("div","translated-content");
+    const languages=[["zh","中文"],["en","English"],["ko","한국어"]];
+    const buttons=[],panels=[];
+    let active=0;
+    const show=()=>{
+      buttons.forEach((button,i)=>{
+        const selected=i===active;button.setAttribute("aria-pressed",String(selected));button.classList.toggle("active",selected);
+        panels[i].hidden=!selected;
+        const key=group.find(f=>f[0].endsWith("_"+languages[i][0]))?.[0];
+        const filled=key&&String(obj[key]??"").trim().length>0;
+        button.textContent=languages[i][1]+(filled?" ✓":" · 未填");
+      });
+    };
+    languages.forEach(([lang,label],i)=>{
+      const row=group.find(f=>f[0].endsWith("_"+lang));
+      const button=btn(label,()=>{active=i;show();});
+      button.className="translated-tab";button.setAttribute("aria-label",title.textContent+" — "+label);
+      const panel=el("div","translated-panel");
+      if(row){
+        const field=fieldRow(obj,[row[0],label,row[2]]);
+        const input=field.querySelector("input,textarea,select");
+        if(input)input.addEventListener("input",show);
+        panel.append(field);
+      }
+      buttons.push(button);panels.push(panel);tabs.append(button);content.append(panel);
+    });
+    show();wrap.append(title,tabs,content);return wrap;
+  }
+  function fields(container,obj,defs){
+    const grid=el("div","form-grid"),seen=new Set();
+    for(const f of defs){
+      const match=f[0].match(/^(.*)_(zh|en|ko)$/);
+      if(match){
+        if(seen.has(match[1]))continue;
+        const group=defs.filter(x=>x[0]===match[1]+"_zh"||x[0]===match[1]+"_en"||x[0]===match[1]+"_ko");
+        if(group.length>=2){
+          seen.add(match[1]);grid.append(translatedField(obj,group));continue;
+        }
+      }
+      grid.append(fieldRow(obj,f));
+    }
+    container.append(grid);
+  }
   function contactLinkEditor(){
     const box=el("section","contact-channel-editor");
     const head=el("div","panel-title");head.append(el("h2","","自訂聯絡管道"),el("span","","可新增最多 30 筆"));box.append(head);
