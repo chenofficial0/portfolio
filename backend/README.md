@@ -1,6 +1,6 @@
 # CHEN. Content Studio — Phase 2 secure publishing API
 
-Status: **source code prepared; NOT deployed or authenticated**. This folder is a server-side Cloudflare Worker. The existing GitHub Pages site remains live; the new API does not operate until provisioned.
+Status: **Cloudflare Worker / Content Studio staging is in acceptance testing; live publishing remains disabled.** This document describes the development branch only. Confirm actual online configuration in Cloudflare Dashboard before trusting deployment state. Do not publish test content to GitHub Pages during security checks.
 
 ## Why a separate backend?
 
@@ -25,10 +25,19 @@ Not yet included: direct photo/PDF upload, GitHub App fine-grained installation 
 4. Fill `PUBLIC_API_ORIGIN` with exact deployed HTTPS Worker origin (no slash at end) and `GITHUB_CLIENT_ID` with the OAuth App client ID. These two values are public configuration, not secrets.
 5. Add secrets using Cloudflare's dashboard or `npx wrangler secret put GITHUB_CLIENT_SECRET` and `npx wrangler secret put SESSION_ENCRYPTION_KEY`. The encryption key must be **32 cryptographically random bytes encoded in base64**. Generate locally using a password manager or trusted cryptographic tool; never paste these secrets into chat or GitHub.
 6. Run `npx wrangler deploy` inside `backend/`. Check that the deployment hostname is exactly the hostname configured in `PUBLIC_API_ORIGIN` and the GitHub OAuth callback.
-7. Open `https://<your-worker-host>/studio`, sign in with GitHub, confirm the account name, edit a harmless test field, and publish. Check the resulting GitHub commit and GitHub Pages site.
-8. Test rejection of unauthenticated requests, GitHub accounts outside the allowlist, expired sessions, mismatched CSRF header, and stale file SHA. Verify that `content/site.json` remains public content and does not contain secrets.
+7. Open the Worker `/studio`, sign in with the approved GitHub account, and verify draft save, draft preview, and media upload **on the staging branch only**. Do not invoke `/api/publish/confirm` or enable publishing.
+8. Verify access rejection, expired sessions, mismatched CSRF, invalid media, and stale file SHA using safe read-only requests or isolated tests. Compare deployed Cloudflare Variables / Secrets and KV bindings with this configuration, without exposing secret values. Verify that `content/site.json` contains no secrets.
 
-**Do not enable live publishing before steps 1–8 have been completed.**
+**Live publishing must remain disabled unless the owner explicitly approves it after a separate production-readiness review.** Passing tests or checking an acceptance box does not authorize publication.
+
+## Security acceptance status (2026-11-13)
+
+- Owner reported passing the previous Content Studio and cross-device user acceptance checks.
+- Static checks and isolated negative-path tests passed for input validation, cross-origin writes, and the `ENABLE_LIVE_PUBLISH = "false"` early rejection. This is **not** a live Cloudflare or penetration test.
+- The deployed Worker's actual Variables / Secrets / KV bindings and deployed code version have **not** been independently inspected here. The Cloudflare dashboard owner must check them directly.
+- Expected: `PUBLIC_API_ORIGIN` matches the Worker host; `STUDIO_KV` is bound to the intended namespace; `GITHUB_CLIENT_SECRET` and `SESSION_ENCRYPTION_KEY` exist as **secrets** (never paste or reveal values); `ENABLE_LIVE_PUBLISH` is `false` in the deployed environment and all applicable environment overrides.
+- Isolated tests are not a substitute for checking actual unauthenticated API rejection, OAuth allowlisting, expired cookies, CSRF failures, stale SHA conflict, and safe media rejection in the deployed environment. Use only authorized test accounts, no production writes, and never invoke an actual publish action.
+- Existing OAuth scope `public_repo read:user` has broad repository access. Review migration to a repository-restricted GitHub App before production readiness.
 
 ## Rollback and safety
 
