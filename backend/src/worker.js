@@ -164,6 +164,43 @@ async function saveContent(request,session,env){
     return json({ok:true,sha:response.content?.sha||null,commit:response.commit?.sha||null});
   }catch(e){return fail([409,422].includes(e.http)?"Website content may have changed; reload before publishing":"GitHub publish failed",[409,422].includes(e.http)?409:502)}
 }
+
+const VALID_UPLOAD_SCOPES=new Set(["hero","profile","gallery","work-cover","work-still"]);
+function validatedJpeg(payload){
+  if(!payload || typeof payload!=="object" || !VALID_UPLOAD_SCOPES.has(payload.scope) || payload.mime!=="image/jpeg" || typeof payload.base64!=="string")return null;
+  // A 1.5 MiB upper limit for JPEGs already compressed in the browser.
+  if(payload.base64.length<132 || payload.base64.length>2097152 || !/^[A-Za-z0-9+/]+={0,2}$/.test(payload.base64))return null;
+  let decoded;
+  try{decoded=atob(payload.base64)}catch(_){return null}
+  if(decoded.length<100 || decoded.length>1572864)return null;
+  // Require a JPEG file signature and closing marker. Never accept SVG, HTML or arbitrary paths.
+  if(decoded.charCodeAt(0)!==0xff || decoded.charCodeAt(1)!==0xd8 ||
+     decoded.charCodeAt(decoded.length-2)!==0xff || decoded.charCodeAt(decoded.length-1)!==0xd9)return null;
+  return {scope:payload.scope,base64:payload.base64};
+}
+async function uploadImage(request,session,env){
+  // This permission is separate from content publishing and defaults to disabled.
+  if(env.ENABLE_MEDIA_UPLOADS!=="true")return fail("Photo upload is disabled until reviewed",403);
+  if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
+  const size=Number(request.headers.get("content-length")||0);
+  if(size>2200000)return fail("Upload too large",413);
+  const raw=await request.text();
+  if(raw.length>2200000)return fail("Upload too large",413);
+  let parsed;try{parsed=JSON.parse(raw)}catch(_){return fail("Invalid upload JSON")}
+  const photo=validatedJpeg(parsed);
+  if(!photo)return fail("Only small JPEG photos are supported",422);
+  const path="assets/uploads/chen-"+photo.scope+"-"+new Date().toISOString().slice(0,10)+"-"+random().slice(0,16)+".jpg";
+  try{
+    const result=await github("/repos/"+REPO+"/contents/"+path,session.token,{
+      method:"PUT",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({message:"Stage CHEN. photo for review",content:photo.base64,branch:CONTENT_BRANCH})
+    });
+    return json({ok:true,path,url:"https://chenofficial0.github.io/portfolio/"+path,
+      staging:true,commit:result.commit?.sha||null});
+  }catch(err){return fail("Unable to stage image to GitHub",err.http===403?403:502)}
+}
+
 async function studio(env){
   const upstream=await fetch(PUBLIC_STUDIO,{headers:{"Cache-Control":"no-cache"}});
   if(!upstream.ok)return fail("Studio page has not deployed yet",503);
@@ -194,9 +231,13 @@ export default {
         r.headers.append("set-cookie",cookie("chen_session","",0));return r;
       }
       const s=await session(request,env);
-      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_CONTENT_WRITES==="true"}:{authenticated:false,canPublish:false});
+      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_CONTENT_WRITES==="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true"}:{authenticated:false,canPublish:false,canUpload:false});
       if(!s)return fail("Sign in with approved GitHub account",401);
       if(method==="GET"&&path==="/api/content")return getContent(s);
+      if(method==="POST"&&path==="/api/media/image"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return uploadImage(request,s,env);
+      }
       if(method==="PUT"&&path==="/api/content"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return saveContent(request,s,env);
