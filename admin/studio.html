@@ -385,6 +385,35 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     }
     container.append(grid);
   }
+  function profileLinkEditor(){
+    const box=el("section","contact-channel-editor");
+    const head=el("div","panel-title");
+    head.append(el("h2","","自訂資料連結"),el("span","","最多 30 筆・可自行排序"));box.append(head);
+    box.append(el("p","toolbar-note","為每個按鈕設定名稱及 HTTPS 網址；只有名稱與網址都填寫後，才會顯示在 PROFILE 資料卡。"));
+    if(!Array.isArray(data.profile.links))data.profile.links=[];
+    const list=el("div","contact-channel-list");box.append(list);
+    const refresh=()=>{
+      list.replaceChildren();
+      data.profile.links.forEach((item,i)=>{
+        const row=el("div","contact-channel-row");
+        const name=fieldRow(item,["label","連結顯示名稱"]);
+        const url=fieldRow(item,["url","HTTPS 網址"]);
+        const actions=el("div","entry-actions");
+        const up=btn("↑",()=>{if(i<1)return;[data.profile.links[i-1],data.profile.links[i]]=[data.profile.links[i],data.profile.links[i-1]];markDirty();refresh()});
+        up.disabled=i===0;up.setAttribute("aria-label","上移連結");
+        const down=btn("↓",()=>{if(i>=data.profile.links.length-1)return;[data.profile.links[i],data.profile.links[i+1]]=[data.profile.links[i+1],data.profile.links[i]];markDirty();refresh()});
+        down.disabled=i===data.profile.links.length-1;down.setAttribute("aria-label","下移連結");
+        const remove=btn("刪除",()=>{if(!confirm("確定刪除此資料連結？"))return;data.profile.links.splice(i,1);markDirty();refresh()});
+        actions.append(up,down,remove);
+        row.append(name,url,actions);list.append(row);
+      });
+    };
+    const add=btn("＋ 新增資料連結",()=>{
+      if(data.profile.links.length>=30){alert("最多 30 筆資料連結");return}
+      data.profile.links.push({label:"",url:""});markDirty();refresh();
+    },"btn dark");
+    box.append(add);refresh();return box;
+  }
   function contactLinkEditor(){
     const box=el("section","contact-channel-editor");
     const head=el("div","panel-title");head.append(el("h2","","自訂聯絡管道"),el("span","","可新增最多 30 筆"));box.append(head);
@@ -417,6 +446,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       const defs=current==="about"?aboutFields:current==="profile"?profileFields:contactFields;
       const p=panel(d[1],"資料變更不會自動發布");
       fields(p,data[current],defs);
+      if(current==="profile")p.append(profileLinkEditor());
       if(current==="contact"){
         p.append(contactLinkEditor());
         if(data.contact.other_url)p.append(fieldRow(data.contact,["other_url","既有其他社群連結（舊欄位）"]));
