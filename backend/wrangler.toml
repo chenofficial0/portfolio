@@ -14,6 +14,8 @@ id = "f5115459b9a0488186850f92f1ee8cfc"
 ENABLE_CONTENT_WRITES = "false"
 ENABLE_MEDIA_UPLOADS = "true"
 ENABLE_DRAFT_SAVES = "true"
+# Release remains locked until staging preview and publish workflow pass acceptance checks.
+ENABLE_LIVE_PUBLISH = "false"
 # Must match the exact deployed API origin, e.g. https://chen-content-studio-api.YOUR-SUBDOMAIN.workers.dev
 PUBLIC_API_ORIGIN = "https://chen-content-studio-api.clyichen0312.workers.dev"
 GITHUB_CLIENT_ID = "Ov23lidWfrNSvOTLZnoC"
