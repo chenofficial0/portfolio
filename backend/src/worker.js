@@ -292,7 +292,11 @@ async function preparePublish(session,env){
   for(const path of staged){
     try{
       const asset=await github("/repos/"+REPO+"/contents/"+path+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
-      if(asset.type!=="file"||asset.size>1572864||!asset.sha)return fail("Invalid staged photo: "+path,422);
+      if(asset.type!=="file"||asset.size>1572864||!asset.sha||asset.encoding!=="base64"||!asset.content)return fail("Invalid staged photo: "+path,422);
+      // Reject non-JPEG content renamed as .jpg.
+      const bytes=atob(asset.content.replace(/\s/g,""));
+      if(bytes.length<100||bytes.charCodeAt(0)!==255||bytes.charCodeAt(1)!==216||
+         bytes.charCodeAt(bytes.length-2)!==255||bytes.charCodeAt(bytes.length-1)!==217)return fail("Invalid JPEG file: "+path,422);
     }catch(_){return fail("Missing uploaded photo on staging branch",422)}
   }
   const differences=["about","profile","works","gallery","contact"].filter(k=>JSON.stringify(draft.data[k])!==JSON.stringify(live.data[k]));
@@ -329,7 +333,10 @@ async function confirmPublish(request,session,env){
   const changes=[{path:CONTENT_PATH,mode:"100644",type:"blob",sha:draft.sha}];
   for(const path of refs){
     const asset=await github("/repos/"+REPO+"/contents/"+path+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
-    if(asset.type!=="file"||!asset.sha||asset.size>1572864)return fail("Staged photo is missing or invalid",422);
+    if(asset.type!=="file"||!asset.sha||asset.size>1572864||asset.encoding!=="base64"||!asset.content)return fail("Staged photo is missing or invalid",422);
+    const bytes=atob(asset.content.replace(/\s/g,""));
+    if(bytes.length<100||bytes.charCodeAt(0)!==255||bytes.charCodeAt(1)!==216||
+       bytes.charCodeAt(bytes.length-2)!==255||bytes.charCodeAt(bytes.length-1)!==217)return fail("Staged image is not a valid JPEG",422);
     changes.push({path,mode:"100644",type:"blob",sha:asset.sha});
   }
   const tree=await github("/repos/"+REPO+"/git/trees",session.token,{
