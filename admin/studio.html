@@ -78,6 +78,11 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
 .profile-resource-control{min-width:0;display:grid;gap:10px}
 .profile-resource-control .field{min-width:0}
 .profile-resource-control input[type=file]{padding:9px;font-size:11px}
+.fixed-resource-list{display:grid;gap:14px}
+.fixed-resource-entry{border:1px solid var(--line);padding:16px;min-width:0}
+.fixed-resource-entry h3{font-size:12px;font-weight:500;margin:0 0 14px}
+.fixed-resource-entry .profile-resource-control{grid-template-columns:minmax(0,1fr) minmax(0,1.7fr);align-items:start}
+@media(max-width:700px){.fixed-resource-entry .profile-resource-control{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -132,8 +137,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     ["hair_color_zh","髮色（中文）"],["hair_color_en","髮色（英文）"],["hair_color_ko","髮色（韓文）"],
     ["eye_color_zh","瞳色（中文）"],["eye_color_en","瞳色（英文）"],["eye_color_ko","瞳色（韓文）"],
     ["agency_zh","經紀公司（中文）"],["agency_en","經紀公司（英文）"],["agency_ko","經紀公司（韓文）"],
-    ["skills_zh","專長（中文）"],["skills_en","專長（英文）"],["skills_ko","專長（韓文）"],
-    ["model_card_pdf","模特卡 PDF 路徑"],["resume_pdf","演員履歷 PDF 路徑"],["showreel_url","演出影片連結"]
+    ["skills_zh","專長（中文）"],["skills_en","專長（英文）"],["skills_ko","專長（韓文）"]
   ];
   const contactFields=[["email","工作信箱","email"],["instagram","Instagram 連結"]];
   const workFields=[
@@ -484,6 +488,31 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     },"btn dark");
     box.append(add);refresh();return box;
   }
+  function fixedProfileResourcesEditor(){
+    const box=el("section","contact-channel-editor");
+    const head=el("div","panel-title");
+    head.append(el("h2","","主要演員資料檔案"),el("span","","格式可自選 · 保留既有設定"));
+    box.append(head);
+    box.append(el("p","toolbar-note","三項資料都可設定 HTTPS 網址，或上傳 PDF、JPG、PNG（單檔 4 MB 以下）。表演影片也可貼上 YouTube、Vimeo 等公開影片網址。未設定的項目不會顯示在網站上。"));
+    const defs=[
+      ["model_card_pdf","模特卡"],
+      ["resume_pdf","演員履歷"],
+      ["showreel_url","演出影片／作品連結"]
+    ];
+    const grid=el("div","fixed-resource-list");
+    defs.forEach(([key,label])=>{
+      const adapter={};
+      Object.defineProperties(adapter,{
+        url:{enumerable:true,get:()=>data.profile[key]||"",set:value=>{data.profile[key]=value}},
+        kind:{enumerable:true,get:()=>data.profile[key+"_kind"]||"",set:value=>{data.profile[key+"_kind"]=value}}
+      });
+      const row=el("div","fixed-resource-entry");
+      row.append(el("h3","",label),resourceInput(adapter));
+      grid.append(row);
+    });
+    box.append(grid);
+    return box;
+  }
   function contactLinkEditor(){
     const box=el("section","contact-channel-editor");
     const head=el("div","panel-title");head.append(el("h2","","自訂聯絡管道"),el("span","","可新增最多 30 筆"));box.append(head);
@@ -516,7 +545,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       const defs=current==="about"?aboutFields:current==="profile"?profileFields:contactFields;
       const p=panel(d[1],"資料變更不會自動發布");
       fields(p,data[current],defs);
-      if(current==="profile")p.append(profileLinkEditor());
+      if(current==="profile"){p.append(fixedProfileResourcesEditor(),profileLinkEditor());}
       if(current==="contact"){
         p.append(contactLinkEditor());
         if(data.contact.other_url)p.append(fieldRow(data.contact,["other_url","既有其他社群連結（舊欄位）"]));
