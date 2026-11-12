@@ -14,7 +14,7 @@ id = "f5115459b9a0488186850f92f1ee8cfc"
 ENABLE_CONTENT_WRITES = "false"
 # Must match the exact deployed API origin, e.g. https://chen-content-studio-api.YOUR-SUBDOMAIN.workers.dev
 PUBLIC_API_ORIGIN = "https://chen-content-studio-api.clyichen0312.workers.dev"
-GITHUB_CLIENT_ID = "REPLACE_WITH_GITHUB_OAUTH_CLIENT_ID"
+GITHUB_CLIENT_ID = "Ov23lidWfrNSvOTLZnoC"
 
 # Secrets (set with wrangler secret put; NEVER commit them):
 # GITHUB_CLIENT_SECRET
