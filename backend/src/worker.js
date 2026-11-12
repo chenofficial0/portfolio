@@ -194,7 +194,7 @@ export default {
         r.headers.append("set-cookie",cookie("chen_session","",0));return r;
       }
       const s=await session(request,env);
-      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf}:{authenticated:false});
+      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_CONTENT_WRITES==="true"}:{authenticated:false,canPublish:false});
       if(!s)return fail("Sign in with approved GitHub account",401);
       if(method==="GET"&&path==="/api/content")return getContent(s);
       if(method==="PUT"&&path==="/api/content"){
