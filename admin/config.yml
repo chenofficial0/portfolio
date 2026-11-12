@@ -45,6 +45,20 @@ collections:
             fields:
               - {label: PROFILE 形象照片, name: photo, widget: image, required: false}
               - {label: 身高（例：160 cm）, name: height, widget: string, required: false}
+              - {label: 體重（可選填，例如 50 kg）, name: weight, widget: string, required: false}
+              - {label: 胸圍（可選填，例如 80 cm）, name: bust, widget: string, required: false}
+              - {label: 腰圍（可選填，例如 60 cm）, name: waist, widget: string, required: false}
+              - {label: 臀圍（可選填，例如 86 cm）, name: hips, widget: string, required: false}
+              - {label: 鞋碼（請註明尺寸系統，例如 EU 37）, name: shoe_size, widget: string, required: false}
+              - {label: 髮色（中文）, name: hair_color_zh, widget: string, required: false}
+              - {label: 髮色（英文）, name: hair_color_en, widget: string, required: false}
+              - {label: 髮色（韓文）, name: hair_color_ko, widget: string, required: false}
+              - {label: 瞳色（中文）, name: eye_color_zh, widget: string, required: false}
+              - {label: 瞳色（英文）, name: eye_color_en, widget: string, required: false}
+              - {label: 瞳色（韓文）, name: eye_color_ko, widget: string, required: false}
+              - {label: 經紀公司（中文）, name: agency_zh, widget: string, default: 無}
+              - {label: 經紀公司（英文）, name: agency_en, widget: string, default: None}
+              - {label: 經紀公司（韓文）, name: agency_ko, widget: string, default: 없음}
               - {label: 專長（中文）, name: skills_zh, widget: string, required: false}
               - {label: 專長（英文）, name: skills_en, widget: string, required: false}
               - {label: 專長（韓文）, name: skills_ko, widget: string, required: false}
