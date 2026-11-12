@@ -84,7 +84,7 @@
 
 /* CHEN CMS data bridge */
 .hero-visual.has-photo,.comp-card-photo.has-photo{background:transparent}
-.hero-visual img,.comp-card-photo img{width:100%;height:100%;object-fit:cover}
+.hero-visual img,.comp-card-photo img{width:100%;height:100%;object-fit:contain}
 .comp-card-photo{overflow:hidden}
 .comp-card-button:not(.pending){cursor:pointer;font:inherit}
 .comp-card-button:not(.pending):hover{background:#fff}
@@ -101,6 +101,18 @@
 .comp-card-button{display:inline-flex;align-items:center;gap:0}
 .comp-card-button .link-arrow{margin-left:8px}
 
+/* CHEN. responsive portraits — preserve proportions and avoid cropping */
+.hero-images{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:16px;width:min(100%,660px)}
+.hero-images .hero-visual{width:100%;max-width:none;max-height:none;aspect-ratio:4/5;background:var(--soft);overflow:hidden}
+.hero-images .hero-visual img{width:100%;height:100%;object-fit:contain;object-position:center;transform:none}
+.hero-copy{width:min(100%,660px)}
+.comp-card-photo img,.work-thumb img,.gallery-grid img,.cms-gallery img,.detail-img,.detail-gallery img{object-fit:contain}
+.work-open:hover .work-thumb img{transform:none}
+@media(max-width:700px){
+  .hero-images{display:block;width:100%}
+  .hero-images .hero-secondary{display:none!important}
+  .hero-images .hero-visual{width:100%;aspect-ratio:4/5}
+}
 </style>
   
 </head>
@@ -120,8 +132,13 @@
 
   <main id="main">
     <section id="home" class="hero wrap">
-      <div class="hero-visual hero-empty">
-        <span class="visual-note" data-i18n="portraitPending">PORTRAIT TO BE ADDED</span>
+      <div class="hero-images">
+        <div class="hero-visual hero-empty">
+          <span class="visual-note" data-i18n="portraitPending">PORTRAIT TO BE ADDED</span>
+        </div>
+        <div class="hero-visual hero-secondary hero-empty" aria-label="首頁次要形象照片">
+          <span class="visual-note">SECOND PORTRAIT</span>
+        </div>
       </div>
       <div class="hero-copy">
         <span class="eyebrow">ARTIST — TAIWAN</span>
@@ -345,7 +362,8 @@
     const birth=document.querySelector('.facts > div:first-child');
     if(birth){birth.hidden=!a.show_birth_year;setText('.facts > div:first-child dd',a.birth_year||'')}
     const bio=document.getElementById('bio');if(bio)bio.textContent=choose(a,'bio');
-    mediaImage('.hero-visual',a.hero_image,name);
+    mediaImage('.hero-images .hero-visual:not(.hero-secondary)',a.hero_image,name);
+    mediaImage('.hero-images .hero-secondary',a.hero_image_secondary,name+' — second portrait');
     mediaImage('.comp-card-photo',p.photo,name);
     setText('.comp-card-facts > div:nth-child(1) dd',a.based_in||'');
     setText('.comp-card-facts > div:nth-child(2) dd',language==='en'?'Mandarin / English / Korean':language==='ko'?'중국어 / 영어 / 한국어':(a.languages||[]).join(' / '));
