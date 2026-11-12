@@ -50,3 +50,5 @@ The browser Studio sends the request to the same Worker origin. The GitHub Pages
 - Direct upload endpoint with strict file size, MIME signature and filename validation; image/PDF sanitization.
 - Move to fine-grained GitHub App permissions and release-time audit.
 - Add integration tests and monitoring, formal data schema, and accessible draft preview.
+
+Deployment verification: Cloudflare Builds is connected to this feature branch; confirm a GitHub-triggered build completes successfully before OAuth testing.
