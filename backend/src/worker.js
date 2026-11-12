@@ -216,6 +216,138 @@ async function previewStagedImage(request,session){
   }catch(_){return fail("Image unavailable",404)}
 }
 
+
+const IMAGE_URL_PREFIX="https://chenofficial0.github.io/portfolio/";
+const IMAGE_REF=/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg$/;
+const PREVIEW_HTML="https://chenofficial0.github.io/portfolio/";
+function stagedPath(value){
+  if(typeof value!=="string"||!value.startsWith(IMAGE_URL_PREFIX))return null;
+  const path=value.slice(IMAGE_URL_PREFIX.length);
+  return IMAGE_REF.test(path)?path:null;
+}
+function imageRefs(d){
+  const images=[d.about?.hero_image,d.profile?.photo];
+  for(const w of d.works||[]){
+    images.push(w.cover);
+    for(const st of w.stills||[])images.push(st.image);
+  }
+  for(const g of d.gallery||[])images.push(g.image);
+  return [...new Set(images.map(stagedPath).filter(Boolean))];
+}
+async function rawContent(session,branch){
+  const raw=await github("/repos/"+REPO+"/contents/"+CONTENT_PATH+"?ref="+encodeURIComponent(branch),session.token);
+  if(!raw.content||!raw.sha)return null;
+  const data=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(raw.content.replace(/\s/g,"")),c=>c.charCodeAt(0))));
+  return {sha:raw.sha,data};
+}
+async function getGitHead(session,branch){
+  const ref=await github("/repos/"+REPO+"/git/ref/heads/"+encodeURIComponent(branch).replace(/%2F/gi,"/"),session.token);
+  return ref.object.sha;
+}
+async function previewContent(session){
+  const draft=await rawContent(session,CONTENT_BRANCH);
+  if(!draft||!validate(draft.data))return fail("Draft data is unavailable or invalid",422);
+  const data=JSON.parse(JSON.stringify(draft.data));
+  const rewrite=value=>{
+    const path=stagedPath(value);
+    return path?"/api/media/preview?path="+encodeURIComponent(path):value;
+  };
+  data.about.hero_image=rewrite(data.about.hero_image);
+  data.profile.photo=rewrite(data.profile.photo);
+  for(const w of data.works){
+    w.cover=rewrite(w.cover);
+    for(const st of w.stills||[])st.image=rewrite(st.image);
+  }
+  for(const g of data.gallery)g.image=rewrite(g.image);
+  return json(data);
+}
+async function previewSite(){
+  const upstream=await fetch(PREVIEW_HTML,{headers:{"cache-control":"no-cache"}});
+  if(!upstream.ok)return fail("Public layout unavailable for preview",503);
+  let html=await upstream.text();
+  const source="fetch(new URL('content/site.json',document.baseURI),{cache:'no-store'})";
+  if(!html.includes(source))return fail("Site preview is incompatible with this website version",503);
+  html=html.replace(source,"fetch('/api/preview-content',{cache:'no-store',credentials:'same-origin'})");
+  html=html.replace(/<meta name="robots" content="[^"]*">/,'<meta name="robots" content="noindex, nofollow">');
+  html=html.replace(/<link rel="canonical" href="[^"]*">/,"");
+  html=html.replace("<body>",'<body><div role="status" style="padding:12px 24px;background:#f5f5f2;color:#333;font-size:12px;border-bottom:1px solid #ddd;position:relative;z-index:100">CHEN. / 草稿預覽 — 尚未發布至正式網站　 <a href="/studio" style="text-decoration:underline">返回管理後台</a></div>');
+  const nonce=random();
+  html=html.replace(/<script(\s|>)/g,(_match,after)=>'<script nonce="'+nonce+'"'+after);
+  html=html.replace(/<style(\s|>)/g,(_match,after)=>'<style nonce="'+nonce+'"'+after);
+  return new Response(html,{headers:{
+    "content-type":"text/html; charset=utf-8","cache-control":"no-store",
+    "x-frame-options":"DENY","x-content-type-options":"nosniff",
+    "content-security-policy":"default-src 'none'; script-src 'nonce-"+nonce+"'; style-src 'nonce-"+nonce+"'; style-src-attr 'unsafe-inline'; connect-src 'self'; img-src 'self' data: https:; font-src 'self'; frame-src https:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+  }});
+}
+async function preparePublish(session,env){
+  const [draft,live,stagingHead,mainHead]=await Promise.all([
+    rawContent(session,CONTENT_BRANCH),rawContent(session,"main"),
+    getGitHead(session,CONTENT_BRANCH),getGitHead(session,"main")
+  ]);
+  if(!draft||!live||!validate(draft.data))return fail("Content validation failed; correct draft before publishing",422);
+  const staged=imageRefs(draft.data);
+  if(staged.length>120)return fail("Too many media files to publish at once",422);
+  for(const path of staged){
+    try{
+      const asset=await github("/repos/"+REPO+"/contents/"+path+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
+      if(asset.type!=="file"||asset.size>1572864||!asset.sha)return fail("Invalid staged photo: "+path,422);
+    }catch(_){return fail("Missing uploaded photo on staging branch",422)}
+  }
+  const differences=["about","profile","works","gallery","contact"].filter(k=>JSON.stringify(draft.data[k])!==JSON.stringify(live.data[k]));
+  const id=random();
+  const plan={login:session.login,mainHead,stagingHead,draftSha:draft.sha,media:staged,sections:differences,exp:Date.now()+600000};
+  await env.STUDIO_KV.put("release:"+await digest(id),JSON.stringify(plan),{expirationTtl:600});
+  return json({planId:id,sections:differences,mediaCount:staged.length,media:staged,
+    changed:JSON.stringify(draft.data)!==JSON.stringify(live.data),
+    canPublish:env.ENABLE_LIVE_PUBLISH==="true",
+    note:"Published files will be public. Review all photos and personal details before confirmation."});
+}
+async function confirmPublish(request,session,env){
+  if(env.ENABLE_LIVE_PUBLISH!=="true")return fail("Live publishing has not been approved or enabled",403);
+  if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
+  const raw=await request.text();
+  if(raw.length>3000)return fail("Invalid release request",413);
+  let input;try{input=JSON.parse(raw)}catch(_){return fail("Invalid release request")}
+  if(input?.confirmation!=="PUBLISH"||typeof input.planId!=="string"||input.planId.length>100)return fail("Confirmation required",422);
+  const key="release:"+await digest(input.planId);
+  const record=await env.STUDIO_KV.get(key);
+  if(!record)return fail("Publish review expired; review again",409);
+  const plan=JSON.parse(record);
+  if(plan.login!==session.login||plan.exp<Date.now())return fail("Publish review expired or unauthorized",403);
+  // Invalidate approval before writing; a retry must obtain a fresh review.
+  await env.STUDIO_KV.delete(key);
+  const [mainHead,stagingHead,draft]=await Promise.all([
+    getGitHead(session,"main"),getGitHead(session,CONTENT_BRANCH),rawContent(session,CONTENT_BRANCH)
+  ]);
+  if(mainHead!==plan.mainHead||stagingHead!==plan.stagingHead||draft?.sha!==plan.draftSha)return fail("Site or draft changed; review latest contents again",409);
+  if(!validate(draft.data))return fail("Draft validation failed",422);
+  const refs=imageRefs(draft.data);
+  if(refs.length!==plan.media.length||refs.some((p,i)=>p!==plan.media[i]))return fail("Image list changed; review again",409);
+  const mainCommit=await github("/repos/"+REPO+"/git/commits/"+mainHead,session.token);
+  const changes=[{path:CONTENT_PATH,mode:"100644",type:"blob",sha:draft.sha}];
+  for(const path of refs){
+    const asset=await github("/repos/"+REPO+"/contents/"+path+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
+    if(asset.type!=="file"||!asset.sha||asset.size>1572864)return fail("Staged photo is missing or invalid",422);
+    changes.push({path,mode:"100644",type:"blob",sha:asset.sha});
+  }
+  const tree=await github("/repos/"+REPO+"/git/trees",session.token,{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({base_tree:mainCommit.tree.sha,tree:changes})
+  });
+  const commit=await github("/repos/"+REPO+"/git/commits",session.token,{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({message:"Publish approved CHEN. website content and photos",tree:tree.sha,parents:[mainHead]})
+  });
+  try{
+    await github("/repos/"+REPO+"/git/refs/heads/main",session.token,{
+      method:"PATCH",headers:{"content-type":"application/json"},
+      body:JSON.stringify({sha:commit.sha,force:false})
+    });
+    return json({ok:true,commit:commit.sha,mediaCount:refs.length});
+  }catch(err){return fail("Another update may have occurred; check GitHub before retrying",409)}
+}
+
 async function studio(env){
   const upstream=await fetch(PUBLIC_STUDIO,{headers:{"Cache-Control":"no-cache"}});
   if(!upstream.ok)return fail("Studio page has not deployed yet",503);
@@ -246,9 +378,16 @@ export default {
         r.headers.append("set-cookie",cookie("chen_session","",0));return r;
       }
       const s=await session(request,env);
-      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:false,canSave:env.ENABLE_DRAFT_SAVES==="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true"}:{authenticated:false,canPublish:false,canSave:false,canUpload:false});
+      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_LIVE_PUBLISH==="true",canSave:env.ENABLE_DRAFT_SAVES==="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true"}:{authenticated:false,canPublish:false,canSave:false,canUpload:false});
       if(!s)return fail("Sign in with approved GitHub account",401);
       if(method==="GET"&&path==="/api/content")return getContent(s);
+      if(method==="GET"&&path==="/preview")return previewSite();
+      if(method==="GET"&&path==="/api/preview-content")return previewContent(s);
+      if(method==="GET"&&path==="/api/publish/plan")return preparePublish(s,env);
+      if(method==="POST"&&path==="/api/publish/confirm"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return confirmPublish(request,s,env);
+      }
       if(method==="GET"&&path==="/api/media/preview")return previewStagedImage(request,s);
       if(method==="POST"&&path==="/api/media/image"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
