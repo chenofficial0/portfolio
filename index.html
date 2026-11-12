@@ -113,10 +113,10 @@
 .comp-card-photo img,.work-thumb img,.gallery-grid img,.cms-gallery img,.detail-img,.detail-gallery img{object-fit:contain}
 .work-open:hover .work-thumb img{transform:none}
 @media(max-width:700px){
-  /* Symmetric breathing room within the page margins, independent of photo aspect ratio. */
-  .hero-images{width:100%;gap:0;justify-content:center}
+  /* Fill the content column: image edge aligns with the name, page margins stay even. */
+  .hero-images{width:100%;gap:0;justify-content:flex-start}
   .hero-images .hero-secondary{display:none!important}
-  .hero-images .hero-visual{max-width:calc(100% - 24px);aspect-ratio:auto}
+  .hero-images .hero-visual{width:100%;max-width:100%;aspect-ratio:auto}
 }
 .hero .name-roman-ko{font-size:12px;line-height:1.7;letter-spacing:.035em;margin:2px 0 0;white-space:normal;overflow-wrap:anywhere}
 </style>
@@ -353,7 +353,7 @@
     const boxes=Array.from(holder.querySelectorAll('.hero-visual')).filter(box=>!(box.classList.contains('hero-secondary')&&(mobile||!box.classList.contains('has-photo'))));
     if(!boxes.length)return;
     const gap=mobile?0:20;
-    const width=mobile?Math.max(1,holder.clientWidth-24):holder.clientWidth;
+    const width=holder.clientWidth;
     if(!width)return;
     const ratios=boxes.map(box=>{
       const img=box.querySelector('img');
@@ -361,7 +361,7 @@
       return Math.max(0.2,Math.min(5,ratio));
     });
     const total=ratios.reduce((sum,ratio)=>sum+ratio,0);
-    const height=Math.max(1,Math.min(mobile?480:400,(width-gap*(boxes.length-1))/total));
+    const height=mobile?Math.max(1,width/total):Math.max(1,Math.min(400,(width-gap*(boxes.length-1))/total));
     boxes.forEach((box,index)=>{
       box.style.width=(height*ratios[index]).toFixed(2)+'px';
       box.style.height=height.toFixed(2)+'px';
