@@ -28,7 +28,19 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .field{min-width:0;display:flex;flex-direction:column;gap:7px}.field.full{grid-column:1/-1}
 .field label{font-size:11px;color:#777}.field input,.field textarea,.field select{width:100%;border:1px solid #dddcd7;background:white;border-radius:0;padding:11px 12px;color:#1b1b1b;min-height:43px}
 .field textarea{min-height:114px;resize:vertical;line-height:1.7}
-.field small{font-size:10px;color:#aaa}.checkline{display:flex;align-items:center;gap:9px;font-size:12px}.checkline input{width:15px;height:15px}
+.field small{font-size:10px;color:#aaa}
+.photo-uploader{border:1px solid var(--line);padding:18px;background:var(--soft);display:grid;gap:13px}
+.photo-uploader img{width:min(100%,380px);max-height:400px;object-fit:contain;background:#eee}
+.photo-uploader .upload-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.photo-uploader .upload-status{font-size:11px;color:#666;white-space:pre-wrap;overflow-wrap:anywhere}
+.photo-uploader button:disabled{opacity:.5;cursor:not-allowed}
+.photo-uploader .upload-status{line-height:1.8}
+.photo-stills{grid-column:1/-1;display:grid;gap:15px}
+.still-entry{border:1px solid var(--line);padding:18px;display:grid;gap:12px}
+.still-entry .photo-uploader{border:0;padding:0}
+.still-top{display:flex;justify-content:space-between;align-items:center;gap:15px}
+
+.checkline{display:flex;align-items:center;gap:9px;font-size:12px}.checkline input{width:15px;height:15px}
 .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
 .metric{padding:19px;border:1px solid var(--line);min-height:98px}.metric strong{display:block;font-size:28px;font-weight:400}.metric span{display:block;color:#999;font-size:10px;margin-top:7px}
 .collection{display:grid;gap:11px}.entry{border:1px solid var(--line);padding:16px;display:flex;gap:15px;align-items:center;justify-content:space-between}.entry-info{min-width:0}.entry-title{font-weight:500;font-size:13px;overflow-wrap:anywhere}.entry-sub{font-size:10px;color:#929292;margin-top:3px}.entry-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -85,11 +97,11 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     ["name_zh","中文姓名"],["name_en","英文姓名"],["name_ko","韓文姓名"],
     ["birth_year","出生年份","number"],["show_birth_year","公開出生年份","checkbox"],["based_in","所屬地區"],
     ["languages","語言能力（以逗號分隔）","languages"],
-    ["hero_image","首頁形象照片路徑或網址"],
+    ["hero_image","首頁形象照片","photo"],
     ["bio_zh","中文簡介","textarea"],["bio_en","英文簡介","textarea"],["bio_ko","韓文簡介","textarea"]
   ];
   const profileFields=[
-    ["photo","PROFILE 形象照片路徑或網址"],["height","身高（cm）"],["weight","體重（可選填）"],
+    ["photo","PROFILE 形象照片","photo"],["height","身高（cm）"],["weight","體重（可選填）"],
     ["bust","胸圍"],["waist","腰圍"],["hips","臀圍"],["shoe_size","鞋碼"],
     ["hair_color_zh","髮色（中文）"],["hair_color_en","髮色（英文）"],["hair_color_ko","髮色（韓文）"],
     ["eye_color_zh","瞳色（中文）"],["eye_color_en","瞳色（英文）"],["eye_color_ko","瞳色（韓文）"],
@@ -102,12 +114,12 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     ["title_zh","作品名稱（中文）"],["title_en","作品名稱（英文）"],["title_ko","作品名稱（韓文）"],
     ["year","年份","number"],["production","製作公司 / 品牌"],
     ["role_zh","角色（中文）"],["role_en","角色（英文）"],["role_ko","角色（韓文）"],
-    ["category","作品類型","category"],["cover","封面圖路徑或網址"],
+    ["category","作品類型","category"],["cover","作品封面照片","photo"],
     ["video_url","影片網址"],["video_label","影片按鈕文字"],["visible","公開作品","checkbox"],
-    ["stills","劇照（每行一個圖片路徑或網址）","stills"]
+    ["stills","作品劇照","photoList"]
   ];
   const galleryFields=[
-    ["image","照片路徑或網址"],["caption_zh","中文說明"],["caption_en","英文說明"],["caption_ko","韓文說明"]
+    ["image","攝影相簿照片","photo"],["caption_zh","中文說明"],["caption_en","英文說明"],["caption_ko","韓文說明"]
   ];
   const view=document.getElementById("view");
   const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n};
@@ -121,8 +133,125 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     gallery:Array.isArray(d.gallery)?d.gallery:[],
     contact:(d.contact && typeof d.contact==="object"&&!Array.isArray(d.contact))?d.contact:{}
   });
+  // Image input is local-preview only until an authenticated, tested upload endpoint is enabled.
+  async function compressPhoto(file){
+    if(!["image/jpeg","image/png","image/webp"].includes(file.type))throw Error("只支援 JPG、PNG、WebP");
+    if(file.size>10*1024*1024)throw Error("請選擇小於 10 MB 的照片");
+    const objectURL=URL.createObjectURL(file);
+    let image;
+    try{image=await createImageBitmap(file)}finally{URL.revokeObjectURL(objectURL)}
+    try{
+      const maxSide=2000,ratio=Math.min(1,maxSide/Math.max(image.width,image.height));
+      const canvas=document.createElement("canvas");
+      canvas.width=Math.max(1,Math.round(image.width*ratio));
+      canvas.height=Math.max(1,Math.round(image.height*ratio));
+      const ctx=canvas.getContext("2d");
+      if(!ctx)throw Error("瀏覽器無法處理圖片");
+      ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(image,0,0,canvas.width,canvas.height);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.82));
+      if(!blob||blob.size>1.5*1024*1024)throw Error("照片處理後仍超過上傳限制，請先壓縮");
+      return blob;
+    }finally{image.close?.()}
+  }
+  // Local previews persist when switching tabs, but are never encoded into site.json.
+  // They remain local to this browser tab and are not uploaded to GitHub.
+  const localPhotos=new WeakMap();
+  const activePhotoURLs=new Set();
+  function photoCache(obj){
+    let cache=localPhotos.get(obj);
+    if(!cache){cache=new Map();localPhotos.set(obj,cache)}
+    return cache;
+  }
+  function cachePhoto(obj,key,blob){
+    const cache=photoCache(obj);
+    const previous=cache.get(key);
+    if(previous){URL.revokeObjectURL(previous.url);activePhotoURLs.delete(previous.url)}
+    const url=URL.createObjectURL(blob);
+    activePhotoURLs.add(url);
+    cache.set(key,{blob,url});
+    return url;
+  }
+  function clearPhoto(obj,key){
+    const cache=localPhotos.get(obj);
+    const previous=cache?.get(key);
+    if(previous){URL.revokeObjectURL(previous.url);activePhotoURLs.delete(previous.url);cache.delete(key)}
+  }
+  window.addEventListener("pagehide",()=>{for(const url of activePhotoURLs)URL.revokeObjectURL(url);activePhotoURLs.clear()});
+  function createPhotoEditor(obj,key,label){
+    const wrap=el("div","field full");
+    wrap.append(el("label","",label));
+    const panel=el("div","photo-uploader"),preview=document.createElement("img");
+    preview.alt=label+"預覽";preview.hidden=true;
+    const actions=el("div","upload-actions"),input=document.createElement("input");
+    input.type="file";input.accept="image/jpeg,image/png,image/webp";input.hidden=true;
+    input.setAttribute("aria-label",label+"，選擇照片");
+    const pick=btn("選擇照片",()=>input.click());
+    const upload=btn("上傳至 GitHub",()=>{},"btn dark");
+    // Upload is intentionally disabled while image publishing APIs remain under review.
+    upload.disabled=true;upload.title="安全上傳功能尚未啟用";
+    const status=el("div","upload-status","目前僅支援本機預覽，尚未上傳 GitHub；請勿將預覽當作已儲存。");
+    const pathInput=document.createElement("input");
+    pathInput.type="text";pathInput.value=obj[key]||"";
+    pathInput.placeholder="已上傳照片的網址或路徑（可選填）";
+    pathInput.setAttribute("aria-label",label+"網址");
+    const hint=el("small","","JPG / PNG / WebP，原檔上限 10 MB。選取後自動產生壓縮預覽，不會直接修改網站。");
+    function showPhoto(){
+      const local=localPhotos.get(obj)?.get(key);
+      if(local){preview.src=local.url;preview.hidden=false;status.textContent="本機照片已選擇並壓縮（"+(local.blob.size/1024).toFixed(0)+" KB）。尚未上傳；切換編輯區域仍可預覽，重新整理後會消失。"}
+      else if(obj[key]){preview.src=obj[key];preview.hidden=false;status.textContent="目前顯示已設定的圖片網址／路徑。"}
+      else{preview.removeAttribute("src");preview.hidden=true;status.textContent="尚未選取照片。本機預覽不會自動儲存或發布。"}
+    }
+    showPhoto();
+    input.addEventListener("change",async()=>{
+      const file=input.files?.[0];if(!file)return;
+      try{
+        status.textContent="正在處理照片…";
+        const blob=await compressPhoto(file);
+        cachePhoto(obj,key,blob);
+        showPhoto();
+      }catch(err){status.textContent="無法讀取照片："+err.message}
+      finally{input.value=""}
+    });
+    pathInput.addEventListener("input",()=>{
+      obj[key]=pathInput.value.trim();clearPhoto(obj,key);markDirty();showPhoto();
+    });
+    actions.append(pick,upload);
+    panel.append(preview,actions,input,status,hint,pathInput);
+    wrap.append(panel);
+    return wrap;
+  }
+  function createStillsEditor(work){
+    const wrap=el("div","photo-stills"),top=el("div","still-top");
+    top.append(el("label","","作品劇照（可新增多張）"));
+    if(!Array.isArray(work.stills))work.stills=[];
+    const collection=el("div","collection");
+    function refresh(){
+      collection.replaceChildren();
+      if(!work.stills.length)collection.append(el("div","empty","尚未新增劇照"));
+      for(const [idx,still] of work.stills.entries()){
+        const item=el("div","still-entry"),heading=el("div","still-top");
+        heading.append(el("strong","", "劇照 "+(idx+1)),btn("移除",()=>{
+          if(!confirm("從目前草稿移除此張劇照？"))return;
+          clearPhoto(still,"image");work.stills.splice(idx,1);markDirty();refresh();
+        }));
+        item.append(heading,createPhotoEditor(still,"image","劇照照片"));
+        const caption=el("div","field"),label=el("label","","劇照說明（選填）"),field=document.createElement("input");
+        field.type="text";field.value=still.caption||"";field.setAttribute("aria-label","劇照說明");
+        field.addEventListener("input",()=>{still.caption=field.value;markDirty()});
+        caption.append(label,field);item.append(caption);collection.append(item)
+      }
+    }
+    top.append(btn("+ 新增劇照",()=>{
+      work.stills.push({image:"",caption:""});markDirty();refresh();
+    }));
+    wrap.append(top,collection);refresh();return wrap;
+  }
   function fieldRow(obj,f){
-    const [key,label,type]=f;const wrapper=el("div","field"+(type==="textarea"?" full":""));
+    const [key,label,type]=f;
+    if(type==="photo")return createPhotoEditor(obj,key,label);
+    if(type==="photoList")return createStillsEditor(obj);
+    const wrapper=el("div","field"+(type==="textarea"?" full":""));
     let input;
     if(type==="checkbox"){
       wrapper.className="field full";
@@ -195,7 +324,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
         row.append(info,actions);list.append(row);
         if(selected===i){
           const editor=el("div","collection-editor");fields(editor,x,defs);
-          if(isWork){const tip=el("p","toolbar-note","尚未公開的作品會保留在資料中，但不顯示在前台。劇照請輸入已上傳、可公開使用的圖片網址或路徑。");editor.append(tip)}
+          if(isWork){const tip=el("p","toolbar-note","尚未公開的作品不會顯示在前台。劇照可以直接選擇本機圖片預覽；尚未啟用正式上傳，預覽不會發布到網站。");editor.append(tip)}
           list.append(editor)
         }
       }p.append(list)
