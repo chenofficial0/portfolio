@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>CHEN. | Content Studio</title>
+<style>
+:root{--ink:#1d1d1c;--muted:#858580;--line:#e7e7e3;--paper:#fff;--soft:#f8f8f6;--green:#25634b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:13px/1.65 -apple-system,BlinkMacSystemFont,"Noto Sans TC","Noto Sans KR",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid #777;outline-offset:3px}
+.layout{display:grid;grid-template-columns:244px minmax(0,1fr);min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;border-right:1px solid var(--line);padding:34px 22px;display:flex;flex-direction:column;background:#fff}
+.brand{font-size:25px;font-weight:650;letter-spacing:-.075em;line-height:1.1}.brand-sub{font-size:9px;letter-spacing:.2em;color:var(--muted);margin-top:12px}
+.nav{margin:65px 0 0;display:grid;gap:5px}.nav button{width:100%;display:flex;align-items:center;justify-content:space-between;text-align:left;padding:12px 13px;color:#666;background:none;border:0;font-size:12px}.nav button:hover,.nav button[aria-current="page"]{background:#f5f5f3;color:#111}.nav small{color:#aaa;font-size:10px}
+.side-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:20px;display:grid;gap:13px}.side-foot a{font-size:11px;color:#555}
+.content{width:min(1120px,calc(100% - 100px));margin:0 auto;padding-bottom:95px}
+.topbar{height:98px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:16px}
+.overline{font-size:10px;letter-spacing:.16em;color:#999}.top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn{background:#fff;border:1px solid #d2d2cc;padding:10px 15px;color:#222;font-size:11px;letter-spacing:.015em}.btn:hover{background:#f7f7f5}
+.btn.dark{background:#222;color:white;border-color:#222}.btn.dark:hover{background:#444}.btn:disabled{opacity:.45;cursor:not-allowed}
+.hero{padding:56px 0 41px}.hero h1{font-size:clamp(26px,3vw,39px);font-weight:400;line-height:1.3;letter-spacing:-.015em;margin:11px 0}.hero p{margin:0;color:#777;font-size:12px;max-width:710px}
+.notice{border:1px solid #deded8;background:#fafaf8;padding:16px 19px;color:#555;font-size:11px;line-height:1.9;margin-bottom:35px}
+.panel{border-top:1px solid var(--line);padding:31px 0}.panel-title{display:flex;justify-content:space-between;align-items:baseline;gap:20px;margin-bottom:27px}.panel-title h2{font-weight:500;font-size:15px;margin:0}.panel-title span{font-size:10px;color:#999}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:21px 25px}
+.field{min-width:0;display:flex;flex-direction:column;gap:7px}.field.full{grid-column:1/-1}
+.field label{font-size:11px;color:#777}.field input,.field textarea,.field select{width:100%;border:1px solid #dddcd7;background:white;border-radius:0;padding:11px 12px;color:#1b1b1b;min-height:43px}
+.field textarea{min-height:114px;resize:vertical;line-height:1.7}
+.field small{font-size:10px;color:#aaa}.checkline{display:flex;align-items:center;gap:9px;font-size:12px}.checkline input{width:15px;height:15px}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.metric{padding:19px;border:1px solid var(--line);min-height:98px}.metric strong{display:block;font-size:28px;font-weight:400}.metric span{display:block;color:#999;font-size:10px;margin-top:7px}
+.collection{display:grid;gap:11px}.entry{border:1px solid var(--line);padding:16px;display:flex;gap:15px;align-items:center;justify-content:space-between}.entry-info{min-width:0}.entry-title{font-weight:500;font-size:13px;overflow-wrap:anywhere}.entry-sub{font-size:10px;color:#929292;margin-top:3px}.entry-actions{display:flex;gap:8px;flex-wrap:wrap}
+.empty{padding:34px;border:1px dashed #deded9;color:#aaa;font-size:12px;text-align:center}
+.collection-editor{border:1px solid var(--line);background:#fcfcfb;padding:23px;margin-top:16px}
+.toolbar{display:flex;gap:9px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.toolbar-note{font-size:10px;color:#999}
+.status{font-size:11px;color:#777}.status.good{color:var(--green)}
+footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#999}
+[hidden]{display:none!important}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.sidebar{position:static;height:auto;padding:20px 18px;border-bottom:1px solid var(--line);border-right:0}.brand{font-size:23px}.brand-sub{margin-top:3px}.nav{margin:18px -4px 0;display:flex;overflow-x:auto;gap:3px}.nav button{width:auto;white-space:nowrap;padding:10px}.nav small,.side-foot{display:none}.content{width:calc(100% - 38px)}.topbar{height:auto;min-height:77px;padding:13px 0}.hero{padding:38px 0 33px}.form-grid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.cards{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-direction:column;gap:9px}.entry{align-items:flex-start;flex-direction:column}.content{width:calc(100% - 30px)}.panel{padding:23px 0}.collection-editor{padding:14px}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div><a href="../" class="brand" aria-label="CHEN. official website">CHEN.</a><div class="brand-sub">CONTENT STUDIO / PREVIEW</div></div>
+    <nav class="nav" aria-label="管理選單">
+      <button data-page="dashboard" aria-current="page">總覽 <small>01</small></button>
+      <button data-page="about">個人介紹 <small>02</small></button>
+      <button data-page="profile">演員資料 <small>03</small></button>
+      <button data-page="works">演出作品 <small>04</small></button>
+      <button data-page="gallery">攝影相簿 <small>05</small></button>
+      <button data-page="contact">合作聯絡 <small>06</small></button>
+    </nav>
+    <div class="side-foot"><a href="../" target="_blank" rel="noopener">查看正式網站 ↗</a><a href="./">開啟原有 Decap 後台 ↗</a></div>
+  </aside>
+  <main class="content">
+    <header class="topbar"><span class="overline">CHEN. / WEBSITE MANAGEMENT</span><div class="top-actions"><button class="btn" id="import">匯入 JSON</button><button class="btn dark" id="export">匯出修改檔案</button></div></header>
+    <section class="hero"><div class="overline" id="page-tag">OVERVIEW</div><h1 id="page-title">網站管理總覽</h1><p id="page-description">管理 CHEN. 官方網站內容。這是客製化後台第一階段，可編輯資料並匯出 JSON；尚未連接安全發布服務。</p></section>
+    <div class="notice" role="note"><strong>預覽版本｜尚未啟用登入與一鍵發布。</strong> 這個頁面不是私密後台。內容編輯只會暫存在目前的瀏覽器分頁記憶體；請使用「匯出修改檔案」保存。請勿輸入密碼、存取權杖或尚未打算公開的機密資料。</div>
+    <div id="view"></div>
+    <footer>CHEN. CONTENT STUDIO · FIRST STAGE · NO AUTHENTICATED PUBLISHING</footer>
+  </main>
+</div>
+<input type="file" id="file-input" accept=".json,application/json" hidden>
+<script>
+(() => {
+  "use strict";
+  const DATA_URL = new URL("../content/site.json", location.href);
+  const pages = {
+    dashboard:["OVERVIEW","網站管理總覽","檢視目前內容完整度，選擇要編輯的網站區域。"],
+    about:["ABOUT","個人介紹","修改中、英、韓姓名與簡介。"],
+    profile:["PROFILE","演員資料","維護演員資料、模特卡與影片連結。"],
+    works:["FILMOGRAPHY","演出作品","新增作品、調整演出資訊，依年份由新到舊顯示。"],
+    gallery:["GALLERY","攝影相簿","新增攝影作品與三語說明。"],
+    contact:["CONTACT","合作聯絡","編輯工作信箱及社群平台連結。"]
+  };
+  const categories=["Film","Drama","Commercial","Music Video","Modeling","Other"];
+  const aboutFields=[
+    ["name_zh","中文姓名"],["name_en","英文姓名"],["name_ko","韓文姓名"],
+    ["birth_year","出生年份","number"],["show_birth_year","公開出生年份","checkbox"],["based_in","所屬地區"],
+    ["languages","語言能力（以逗號分隔）","languages"],
+    ["hero_image","首頁形象照片路徑或網址"],
+    ["bio_zh","中文簡介","textarea"],["bio_en","英文簡介","textarea"],["bio_ko","韓文簡介","textarea"]
+  ];
+  const profileFields=[
+    ["photo","PROFILE 形象照片路徑或網址"],["height","身高（cm）"],["weight","體重（可選填）"],
+    ["bust","胸圍"],["waist","腰圍"],["hips","臀圍"],["shoe_size","鞋碼"],
+    ["hair_color_zh","髮色（中文）"],["hair_color_en","髮色（英文）"],["hair_color_ko","髮色（韓文）"],
+    ["eye_color_zh","瞳色（中文）"],["eye_color_en","瞳色（英文）"],["eye_color_ko","瞳色（韓文）"],
+    ["agency_zh","經紀公司（中文）"],["agency_en","經紀公司（英文）"],["agency_ko","經紀公司（韓文）"],
+    ["skills_zh","專長（中文）"],["skills_en","專長（英文）"],["skills_ko","專長（韓文）"],
+    ["model_card_pdf","模特卡 PDF 路徑"],["resume_pdf","演員履歷 PDF 路徑"],["showreel_url","演出影片連結"]
+  ];
+  const contactFields=[["email","工作信箱","email"],["instagram","Instagram 連結"],["other_url","其他社群連結"]];
+  const workFields=[
+    ["title_zh","作品名稱（中文）"],["title_en","作品名稱（英文）"],["title_ko","作品名稱（韓文）"],
+    ["year","年份","number"],["production","製作公司 / 品牌"],
+    ["role_zh","角色（中文）"],["role_en","角色（英文）"],["role_ko","角色（韓文）"],
+    ["category","作品類型","category"],["cover","封面圖路徑或網址"],
+    ["video_url","影片網址"],["video_label","影片按鈕文字"],["visible","公開作品","checkbox"],
+    ["stills","劇照（每行一個圖片路徑或網址）","stills"]
+  ];
+  const galleryFields=[
+    ["image","照片路徑或網址"],["caption_zh","中文說明"],["caption_en","英文說明"],["caption_ko","韓文說明"]
+  ];
+  const view=document.getElementById("view");
+  const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n};
+  const btn=(label,fn,cls="btn")=>{const b=el("button",cls,label);b.type="button";b.addEventListener("click",fn);return b};
+  let data={about:{},profile:{},works:[],gallery:[],contact:{}}, current="dashboard", selected=null;
+  const cloned=v=>JSON.parse(JSON.stringify(v));
+  const norm=d=>({
+    about:(d.about && typeof d.about==="object"&&!Array.isArray(d.about))?d.about:{},
+    profile:(d.profile && typeof d.profile==="object"&&!Array.isArray(d.profile))?d.profile:{},
+    works:Array.isArray(d.works)?d.works:[],
+    gallery:Array.isArray(d.gallery)?d.gallery:[],
+    contact:(d.contact && typeof d.contact==="object"&&!Array.isArray(d.contact))?d.contact:{}
+  });
+  function fieldRow(obj,f){
+    const [key,label,type]=f;const wrapper=el("div","field"+(type==="textarea"?" full":""));
+    let input;
+    if(type==="checkbox"){
+      wrapper.className="field full";
+      const line=el("label","checkline");input=document.createElement("input");input.type="checkbox";input.checked=Boolean(obj[key]);line.append(input,el("span","",label));wrapper.append(line);
+    }else{
+      wrapper.append(el("label","",label));
+      if(type==="textarea")input=document.createElement("textarea");
+      else if(type==="category"){input=document.createElement("select");for(const c of categories){const o=document.createElement("option");o.value=c;o.textContent=c;input.append(o)}}
+      else{input=document.createElement("input");input.type=type==="number"?"number":type==="email"?"email":"text";if(type==="number")input.min="1900";}
+      if(type==="languages")input.value=Array.isArray(obj[key])?obj[key].join(", "):"";
+      else if(type==="stills")input.value=Array.isArray(obj[key])?obj[key].map(x=>x.image).filter(Boolean).join("\n"):"";
+      else input.value=obj[key]??"";
+      input.setAttribute("aria-label",label);wrapper.append(input);
+    }
+    input.addEventListener(type==="checkbox"?"change":"input",()=>{
+      if(type==="checkbox")obj[key]=input.checked;
+      else if(type==="number")obj[key]=input.value===""?"":Number(input.value);
+      else if(type==="languages")obj[key]=input.value.split(/[,，\n]/).map(x=>x.trim()).filter(Boolean);
+      else if(type==="stills")obj[key]=input.value.split(/\n/).map(x=>x.trim()).filter(Boolean).map(image=>({image,caption:""}));
+      else obj[key]=input.value;
+      markDirty();
+    });
+    return wrapper;
+  }
+  function fields(container,obj,defs){const grid=el("div","form-grid");defs.forEach(f=>grid.append(fieldRow(obj,f)));container.append(grid)}
+  function panel(title,desc){const p=el("section","panel");const head=el("div","panel-title");head.append(el("h2","",title),el("span","",desc));p.append(head);return p}
+  function renderMain(){
+    const d=pages[current];document.getElementById("page-tag").textContent=d[0];
+    document.getElementById("page-title").textContent=d[1];document.getElementById("page-description").textContent=d[2];
+    document.querySelectorAll("[data-page]").forEach(b=>{if(b.dataset.page===current)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
+    view.replaceChildren();
+    if(current==="dashboard")return renderDashboard();
+    if(["about","profile","contact"].includes(current)){
+      const defs=current==="about"?aboutFields:current==="profile"?profileFields:contactFields;
+      const p=panel(d[1],"資料變更不會自動發布");
+      fields(p,data[current],defs);
+      const t=el("div","toolbar");t.style.marginTop="25px";t.append(el("span","toolbar-note","編輯完成後請匯出 JSON，備份你的修改。"),btn("匯出修改檔案",exportJSON));p.append(t);view.append(p);return;
+    }
+    renderCollection();
+  }
+  function renderDashboard(){
+    const stats=el("div","cards");
+    [[String(data.works.length),"演出作品"],[String(data.gallery.length),"攝影作品"],[data.profile.model_card_pdf?"已提供":"尚未提供","模特卡"],[data.contact.email?"已提供":"尚未提供","工作信箱"]].forEach(([value,label])=>{
+      const m=el("div","metric");m.append(el("strong","",value),el("span","",label));stats.append(m);
+    });view.append(stats);
+    const p=panel("網站內容","CONTENT SECTIONS");
+    const list=el("div","collection");
+    [["about","個人介紹","姓名、三語簡介及形象照片"],["profile","演員資料","身高、經紀、履歷及模特卡"],["works","演出作品","電影、影集、廣告與作品資訊"],["gallery","攝影相簿","形象照與劇照"],["contact","合作聯絡","信箱與社群平台"]].forEach(([key,name,sub])=>{
+      const r=el("div","entry"),info=el("div","entry-info");info.append(el("div","entry-title",name),el("div","entry-sub",sub));r.append(info,btn("編輯 →",()=>switchPage(key)));list.append(r)
+    });p.append(list);view.append(p);
+  }
+  function renderCollection(){
+    const isWork=current==="works",arr=data[current],defs=isWork?workFields:galleryFields;
+    const p=panel(isWork?"作品清單":"相簿清單",arr.length+" 筆內容");
+    const tools=el("div","toolbar");tools.style.marginBottom="18px";tools.append(el("span","toolbar-note","清單內容會同步到匯出的 JSON。"),btn(isWork?"+ 新增作品":"+ 新增照片",()=>{
+      const item=isWork?{title_zh:"",year:new Date().getFullYear(),category:"Film",stills:[],visible:false}:{image:"",caption_zh:""};
+      arr.push(item);selected=arr.length-1;renderMain()
+    },"btn dark"));p.append(tools);
+    if(!arr.length)p.append(el("div","empty",isWork?"尚未新增任何正式演出作品。":"相簿目前沒有照片。"));
+    else{
+      const list=el("div","collection");
+      const order=arr.map((x,i)=>({x,i}));if(isWork)order.sort((a,b)=>(Number(b.x.year)||0)-(Number(a.x.year)||0));
+      for(const {x,i} of order){
+        const row=el("div","entry"),info=el("div","entry-info");
+        info.append(el("div","entry-title",(isWork?x.title_zh:x.caption_zh)||"未命名"));
+        info.append(el("div","entry-sub",isWork?String(x.year||"")+" · "+String(x.category||"")+" · "+(x.visible===false?"未公開":"公開"):String(x.image||"尚未設定圖片")));
+        const actions=el("div","entry-actions");
+        actions.append(btn(selected===i?"收起":"編輯",()=>{selected=selected===i?null:i;renderMain()}));
+        actions.append(btn("刪除",()=>{if(confirm("確定要從目前草稿刪除這筆資料嗎？")){arr.splice(i,1);selected=null;markDirty();renderMain()}}));
+        row.append(info,actions);list.append(row);
+        if(selected===i){
+          const editor=el("div","collection-editor");fields(editor,x,defs);
+          if(isWork){const tip=el("p","toolbar-note","尚未公開的作品會保留在資料中，但不顯示在前台。劇照請輸入已上傳、可公開使用的圖片網址或路徑。");editor.append(tip)}
+          list.append(editor)
+        }
+      }p.append(list)
+    }
+    view.append(p)
+  }
+  function switchPage(page){current=page;selected=null;renderMain();window.scrollTo({top:0,behavior:"smooth"})}
+  document.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>switchPage(b.dataset.page)));
+  let changed=false;
+  function markDirty(){changed=true;document.title="* CHEN. | Content Studio"}
+  function exportJSON(){
+    const json=JSON.stringify(data,null,2)+"\n";
+    const blob=new Blob([json],{type:"application/json;charset=utf-8"}),url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download="chen-site.json";document.body.append(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  document.getElementById("export").addEventListener("click",exportJSON);
+  const picker=document.getElementById("file-input");
+  document.getElementById("import").addEventListener("click",()=>picker.click());
+  picker.addEventListener("change",async()=>{
+    const file=picker.files[0];if(!file)return;
+    try{
+      if(file.size>2*1024*1024)throw Error("JSON 檔案超過 2 MB");
+      const parsed=JSON.parse(await file.text());
+      if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw Error("檔案格式不正確");
+      if(!confirm("確定載入這份 JSON？目前未匯出的草稿會被覆蓋。"))return;
+      data=norm(parsed);markDirty();renderMain()
+    }catch(err){alert("無法匯入："+err.message)}finally{picker.value=""}
+  });
+  window.addEventListener("beforeunload",event=>{if(changed){event.preventDefault();event.returnValue=""}});
+  fetch(DATA_URL,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json()}).then(d=>{data=norm(d);renderMain()}).catch(err=>{
+    view.replaceChildren(el("div","notice","無法載入公開網站資料："+err.message+"。請確認 GitHub Pages 已部署，或使用「匯入 JSON」載入現有資料。"));
+  });
+  renderMain();
+})();
+</script>
+</body>
+</html>
