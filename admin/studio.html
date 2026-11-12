@@ -40,6 +40,13 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .release-review ul{padding-left:20px;color:#555;margin:0}
 .release-review .toolbar{justify-content:flex-start}
 .release-review [data-release-status]{font-size:11px;color:#777}
+.release-media{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:14px}
+.release-media figure{margin:0;min-width:0}
+.release-media img{width:100%;height:180px;object-fit:contain;background:#fff;border:1px solid var(--line)}
+.release-media figcaption{font-size:10px;color:#777;overflow-wrap:anywhere;padding-top:5px}
+.release-check{display:flex;gap:8px;align-items:flex-start;font-size:12px}
+.release-check input{margin-top:4px}
+
 
 .photo-uploader .upload-status{line-height:1.8}
 .photo-stills{grid-column:1/-1;display:grid;gap:15px}
@@ -422,9 +429,20 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       reviewPanel.append(el("p","","異動內容："+(plan.sections.length?plan.sections.join("、"):"無內容變更")+"。"));
       reviewPanel.append(el("p","","照片檔案數："+plan.mediaCount+"。圖片一旦發布至正式網站，即可能被搜尋引擎存取。"));
       if(plan.media.length){
-        const list=el("ul");for(const path of plan.media)list.append(el("li","",path));
-        reviewPanel.append(list);
+        const heading=el("p","","請確認以下照片均可公開使用，且版面與人物呈現符合預期：");
+        const mediaGrid=el("div","release-media");
+        for(const path of plan.media){
+          const fig=document.createElement("figure"),img=document.createElement("img");
+          img.loading="lazy";img.alt="待發布的照片";
+          img.src="/api/media/preview?path="+encodeURIComponent(path);
+          fig.append(img,el("figcaption","",path.split("/").pop()));mediaGrid.append(fig);
+        }
+        reviewPanel.append(heading,mediaGrid);
       }
+      const releaseCheck=el("label","release-check");
+      const verified=document.createElement("input");verified.type="checkbox";
+      releaseCheck.append(verified,el("span","","我已檢查草稿預覽、照片、聯絡方式與公開權利；確認發布的內容可以對外公開。"));
+      reviewPanel.append(releaseCheck);
       const status=el("p","",plan.canPublish?"正式發布已開放。請先預覽並確認所有個人資訊與照片。":"目前仍處於安全測試階段：已可檢查發布內容，但正式發布尚未開放。");
       reviewPanel.append(status);
       const actions=el("div","toolbar");
@@ -432,6 +450,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       if(plan.canPublish && plan.changed){
         actions.append(btn("確認發布正式網站",async()=>{
           if(!approvedPlanId)return;
+          if(!verified.checked){alert("請先完成發布內容確認。");return;}
           if(!confirm("最後確認：是否將已儲存草稿與照片同步到正式 CHEN. 官方網站？此操作會建立 GitHub main 提交並公開內容。"))return;
           const finalInput=prompt('請輸入 PUBLISH 以確認正式發布（英文大寫）');
           if(finalInput!=="PUBLISH")return;
