@@ -58,9 +58,9 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     <div class="side-foot"><a href="../" target="_blank" rel="noopener">查看正式網站 ↗</a><a href="./">開啟原有 Decap 後台 ↗</a></div>
   </aside>
   <main class="content">
-    <header class="topbar"><span class="overline">CHEN. / WEBSITE MANAGEMENT</span><div class="top-actions"><button class="btn" id="import">匯入 JSON</button><button class="btn dark" id="export">匯出修改檔案</button></div></header>
+    <header class="topbar"><span class="overline">CHEN. / WEBSITE MANAGEMENT</span><div class="top-actions"><button class="btn" id="import">匯入 JSON</button><button class="btn" id="export">匯出修改檔案</button><button class="btn dark" id="publish" hidden>發布至網站</button><button class="btn" id="login" hidden>使用 GitHub 登入</button><button class="btn" id="logout" hidden>登出</button></div></header>
     <section class="hero"><div class="overline" id="page-tag">OVERVIEW</div><h1 id="page-title">網站管理總覽</h1><p id="page-description">管理 CHEN. 官方網站內容。這是客製化後台第一階段，可編輯資料並匯出 JSON；尚未連接安全發布服務。</p></section>
-    <div class="notice" role="note"><strong>預覽版本｜尚未啟用登入與一鍵發布。</strong> 這個頁面不是私密後台。內容編輯只會暫存在目前的瀏覽器分頁記憶體；請使用「匯出修改檔案」保存。請勿輸入密碼、存取權杖或尚未打算公開的機密資料。</div>
+    <div class="notice" id="auth-notice" role="status"><strong>預覽模式。</strong> 目前未連接已部署的安全服務。可編輯並匯出 JSON；內容不會自動發布。請勿在此輸入密碼或 GitHub Token。</div>
     <div id="view"></div>
     <footer>CHEN. CONTENT STUDIO · FIRST STAGE · NO AUTHENTICATED PUBLISHING</footer>
   </main>
@@ -69,7 +69,9 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
 <script>
 (() => {
   "use strict";
-  const DATA_URL = new URL("../content/site.json", location.href);
+  const DATA_URL = new URL("https://chenofficial0.github.io/portfolio/content/site.json");
+  const isWorkerHost = location.pathname==="/studio" && location.protocol==="https:";
+  let apiSession=null,contentSha=null;
   const pages = {
     dashboard:["OVERVIEW","網站管理總覽","檢視目前內容完整度，選擇要編輯的網站區域。"],
     about:["ABOUT","個人介紹","修改中、英、韓姓名與簡介。"],
@@ -224,10 +226,61 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     }catch(err){alert("無法匯入："+err.message)}finally{picker.value=""}
   });
   window.addEventListener("beforeunload",event=>{if(changed){event.preventDefault();event.returnValue=""}});
-  fetch(DATA_URL,{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json()}).then(d=>{data=norm(d);renderMain()}).catch(err=>{
-    view.replaceChildren(el("div","notice","無法載入公開網站資料："+err.message+"。請確認 GitHub Pages 已部署，或使用「匯入 JSON」載入現有資料。"));
+  const notice=document.getElementById("auth-notice");
+  const login=document.getElementById("login"),logout=document.getElementById("logout"),publish=document.getElementById("publish");
+  async function start(){
+    if(isWorkerHost){
+      try{
+        const response=await fetch("/api/session",{credentials:"same-origin",cache:"no-store"});
+        if(!response.ok)throw Error("無法取得登入狀態");
+        const session=await response.json();
+        if(session.authenticated){
+          apiSession=session;
+          publish.hidden=false;logout.hidden=false;
+          notice.textContent="已透過 GitHub 登入："+session.login+"。可在確認內容後發布到正式網站。請注意：content/site.json 是公開資料。";
+          const contentResponse=await fetch("/api/content",{credentials:"same-origin",cache:"no-store"});
+          if(!contentResponse.ok)throw Error("無法讀取網站的最新資料");
+          const payload=await contentResponse.json();data=norm(payload.data);contentSha=payload.sha;
+        }else{
+          login.hidden=false;
+          notice.textContent="尚未登入。可先以預覽模式編輯並匯出 JSON；只有授權的 GitHub 帳號可以發布。";
+        }
+      }catch(error){notice.textContent="後端尚未準備完成："+error.message+"。目前僅提供預覽與 JSON 匯出。";}
+    }
+    if(!apiSession){
+      try{
+        const r=await fetch(DATA_URL,{cache:"no-store"});
+        if(!r.ok)throw Error("HTTP "+r.status);
+        data=norm(await r.json());
+      }catch(err){notice.textContent+=" 無法載入網站資料："+err.message;}
+    }
+    renderMain();
+  }
+  login.addEventListener("click",()=>{location.href="/auth/login"});
+  logout.addEventListener("click",async()=>{
+    if(!apiSession)return;
+    if(changed&&!confirm("目前有未發布的修改。確定登出嗎？"))return;
+    await fetch("/api/logout",{method:"POST",headers:{"x-chen-csrf":apiSession.csrf},credentials:"same-origin"});
+    changed=false;location.href="/studio";
   });
-  renderMain();
+  publish.addEventListener("click",async()=>{
+    if(!apiSession||!contentSha)return alert("請先完成 GitHub 安全登入");
+    if(!confirm("確定要將目前內容發布至正式網站？網站資料將公開顯示。"))return;
+    publish.disabled=true;publish.textContent="發布中…";
+    try{
+      const response=await fetch("/api/content",{
+        method:"PUT",credentials:"same-origin",
+        headers:{"content-type":"application/json","x-chen-csrf":apiSession.csrf},
+        body:JSON.stringify({sha:contentSha,data})
+      });
+      const result=await response.json();
+      if(!response.ok)throw Error(result.error||"發布失敗");
+      contentSha=result.sha;changed=false;document.title="CHEN. | Content Studio";
+      alert("已提交至 GitHub。GitHub Pages 部署完成後會更新正式網站。");
+    }catch(error){alert("未能發布："+error.message+"。若內容已在其他地方修改，請先匯出備份，重新整理取得最新版本。")}
+    finally{publish.disabled=false;publish.textContent="發布至網站"}
+  });
+  renderMain();start();
 })();
 </script>
 </body>
