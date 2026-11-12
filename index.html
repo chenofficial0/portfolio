@@ -238,12 +238,7 @@
                 </dl>
               </section>
             </div>
-            <div class="comp-card-actions" aria-label="Profile documents and videos">
-              <span class="comp-card-button pending" data-i18n="modelCardAction">模特卡</span>
-              <span class="comp-card-button pending" data-i18n="resumeAction">演員履歷</span>
-              <span class="comp-card-button pending" data-i18n="showreelAction">表演影片</span>
-            </div>
-            <p class="comp-card-note" data-i18n="profileLinksPending">相關資料及連結更新後即可開啟。</p>
+            <div class="comp-card-actions" aria-label="Profile documents and videos"></div>
           </div>
         </div>
       </div>
@@ -479,8 +474,7 @@
         }
       }
     }
-    const pending=document.querySelector('.comp-card-note');
-    if(pending)pending.hidden=true;
+
     const contacts=document.querySelector('.contact-links');
     if(contacts){
       contacts.replaceChildren();
