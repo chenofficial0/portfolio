@@ -1,0 +1,100 @@
+# CHEN. website content editor
+# GitHub Pages can host /admin/ but GitHub OAuth needs a separate provider.
+# Once an OAuth proxy has been configured, add backend.base_url and auth_endpoint.
+backend:
+  name: github
+  repo: chenofficial0/portfolio
+  branch: main
+# base_url: https://YOUR-OAUTH-PROXY.example
+# auth_endpoint: auth
+
+site_url: https://chenofficial0.github.io/portfolio/
+display_url: https://chenofficial0.github.io/portfolio/
+publish_mode: simple
+media_folder: assets/uploads
+public_folder: /portfolio/assets/uploads
+
+collections:
+  - name: website
+    label: CHEN. 網站內容
+    files:
+      - name: site
+        label: 網站資料與照片
+        file: content/site.json
+        format: json
+        fields:
+          - label: 個人介紹 / ABOUT
+            name: about
+            widget: object
+            fields:
+              - {label: 中文姓名, name: name_zh, widget: string}
+              - {label: 英文姓名, name: name_en, widget: string}
+              - {label: 韓文姓名, name: name_ko, widget: string}
+              - {label: 出生年份, name: birth_year, widget: number, value_type: int}
+              - {label: 公開出生年份, name: show_birth_year, widget: boolean, default: true}
+              - {label: 所屬地區, name: based_in, widget: string}
+              - label: 語言能力
+                name: languages
+                widget: list
+                field: {label: 語言, name: language, widget: string}
+              - {label: 中文個人簡介, name: bio_zh, widget: text, required: false}
+              - {label: 英文個人簡介, name: bio_en, widget: text, required: false}
+              - {label: 韓文個人簡介, name: bio_ko, widget: text, required: false}
+              - {label: 首頁形象照片, name: hero_image, widget: image, required: false}
+          - label: 演員資訊 / PROFILE
+            name: profile
+            widget: object
+            fields:
+              - {label: PROFILE 形象照片, name: photo, widget: image, required: false}
+              - {label: 身高（例：160 cm）, name: height, widget: string, required: false}
+              - {label: 專長（中文）, name: skills_zh, widget: string, required: false}
+              - {label: 專長（英文）, name: skills_en, widget: string, required: false}
+              - {label: 專長（韓文）, name: skills_ko, widget: string, required: false}
+              - {label: 模特卡 PDF, name: model_card_pdf, widget: file, required: false}
+              - {label: 演員履歷 PDF, name: resume_pdf, widget: file, required: false}
+              - {label: 表演影片網址, name: showreel_url, widget: string, required: false}
+          - label: 作品 / FILMOGRAPHY
+            name: works
+            widget: list
+            required: false
+            summary: "{{fields.year}} · {{fields.title_zh}}"
+            fields:
+              - {label: 作品名稱（中文）, name: title_zh, widget: string}
+              - {label: 作品名稱（英文）, name: title_en, widget: string, required: false}
+              - {label: 作品名稱（韓文）, name: title_ko, widget: string, required: false}
+              - {label: 年份, name: year, widget: number, value_type: int}
+              - {label: 製作公司 / 品牌, name: production, widget: string, required: false}
+              - {label: 角色（中文）, name: role_zh, widget: string, required: false}
+              - {label: 角色（英文）, name: role_en, widget: string, required: false}
+              - {label: 角色（韓文）, name: role_ko, widget: string, required: false}
+              - label: 類型
+                name: category
+                widget: select
+                options: [Film, Drama, Commercial, Music Video, Modeling, Other]
+              - {label: 封面圖片, name: cover, widget: image, required: false}
+              - label: 作品劇照
+                name: stills
+                widget: list
+                required: false
+                fields:
+                  - {label: 圖片, name: image, widget: image}
+                  - {label: 說明, name: caption, widget: string, required: false}
+              - {label: 影片連結, name: video_url, widget: string, required: false}
+              - {label: 影片顯示文字, name: video_label, widget: string, required: false}
+              - {label: 公開此作品, name: visible, widget: boolean, default: true}
+          - label: 攝影相簿 / GALLERY
+            name: gallery
+            widget: list
+            required: false
+            fields:
+              - {label: 圖片, name: image, widget: image}
+              - {label: 中文標題, name: caption_zh, widget: string, required: false}
+              - {label: 英文標題, name: caption_en, widget: string, required: false}
+              - {label: 韓文標題, name: caption_ko, widget: string, required: false}
+          - label: 合作聯絡 / CONTACT
+            name: contact
+            widget: object
+            fields:
+              - {label: 工作信箱, name: email, widget: string, required: false}
+              - {label: Instagram 完整連結, name: instagram, widget: string, required: false}
+              - {label: 其他社群完整連結, name: other_url, widget: string, required: false}
