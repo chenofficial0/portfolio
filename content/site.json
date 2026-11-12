@@ -47,47 +47,12 @@
     "agency_ko": "없음",
     "links": []
   },
-  "works": [
-    {
-      "title_zh": "測試",
-      "year": 2026,
-      "category": "Film",
-      "stills": [],
-      "visible": true,
-      "title_en": "test",
-      "title_ko": "어..",
-      "role_zh": "路人",
-      "role_en": "www",
-      "role_ko": "ㅋㅋㅋ",
-      "cover": "https://chenofficial0.github.io/portfolio/assets/uploads/chen-work-cover-2026-11-12-ktECV3daib3_SiTo.jpg"
-    }
-  ],
-  "gallery": [
-    {
-      "image": "https://chenofficial0.github.io/portfolio/assets/uploads/chen-gallery-2026-11-12-L3iuX_fLkxzQGYQK.jpg",
-      "caption_zh": "xbznsnjjsnss",
-      "description_zh": "bdjsn ddd",
-      "year": 2026,
-      "title_zh": "zbznsnjss",
-      "title_en": "zbsnjjsdddf",
-      "title_ko": "cbbc"
-    },
-    {
-      "image": "https://chenofficial0.github.io/portfolio/assets/uploads/chen-gallery-2026-11-12-Ykhfk4t94uuVrwLo.jpg",
-      "caption_zh": "snjsns",
-      "caption_en": "snjsjs",
-      "caption_ko": "shhs"
-    },
-    {
-      "image": "https://chenofficial0.github.io/portfolio/assets/uploads/chen-gallery-2026-11-12-5SYyklIWQ_sTlK1L.jpg",
-      "caption_zh": "11111",
-      "caption_en": "ㅇㄴㅇㅇ",
-      "caption_ko": "ㅋㄴㄴ"
-    }
-  ],
+  "works": [],
+  "gallery": [],
   "contact": {
     "email": "clyichen0312@gmail.com",
     "instagram": "https://www.instagram.com/c.yichen___?rpxt=YnBqcmR1MTJqeTRr&utm_source=qr",
-    "other_url": ""
+    "other_url": "",
+    "links": []
   }
 }
