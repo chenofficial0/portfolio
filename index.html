@@ -143,6 +143,7 @@
 /* Profile card: hide stale photo placeholder and keep translated save control fixed. */
 .comp-card-photo.has-photo [data-i18n="profilePhotoPending"]{display:none!important}
 .comp-card-export{min-width:132px;justify-content:center;text-align:center;white-space:nowrap}
+.comp-card-export:disabled{opacity:.6;cursor:progress}
 </style>
   
 </head>
@@ -417,65 +418,62 @@
     if(safeFile(url)){const img=document.createElement('img');img.src=url;img.alt=alt;img.loading=selector.includes('hero')?'eager':'lazy';if(box.closest('.hero-images'))img.addEventListener('load',resizeHeroPortraits);box.prepend(img)}
     if(box.closest('.hero-images'))resizeHeroPortraits();
   };
-  // A real <img> lets mobile browsers offer Save Image on long-press and desktop
-  // browsers offer Save Image As in the native right-click menu.
+  // Capture the real, responsive card DOM rather than redrawing text and images.
+  // Pinned html2canvas release; the integrity attribute prevents unexpected CDN changes.
+  const captureNonce=document.currentScript?.nonce||"";
+  let captureLibraryPromise=null;
+  function ensureCaptureLibrary(){
+    if(typeof window.html2canvas==="function")return Promise.resolve(window.html2canvas);
+    if(captureLibraryPromise)return captureLibraryPromise;
+    captureLibraryPromise=new Promise((resolve,reject)=>{
+      const script=document.createElement("script");
+      script.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+      script.integrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==";
+      script.crossOrigin="anonymous";
+      script.referrerPolicy="no-referrer";
+      if(captureNonce)script.nonce=captureNonce;
+      script.onload=()=>{
+        if(typeof window.html2canvas==="function")resolve(window.html2canvas);
+        else reject(Error("圖片工具未正確載入"));
+      };
+      script.onerror=()=>reject(Error("圖片工具無法載入，請檢查網路連線"));
+      document.head.append(script);
+    }).catch(error=>{captureLibraryPromise=null;throw error});
+    return captureLibraryPromise;
+  }
   async function makeModelCardImage(){
     const card=document.querySelector('.comp-card'),dialog=document.getElementById('model-card-image-dialog');
     const output=document.getElementById('model-card-image'),download=document.getElementById('model-card-image-download');
+    const button=document.getElementById('model-card-image-button');
     if(!card||!dialog||!output||!download)return;
-    const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
-    if(!ctx)return;
-    const W=960,margin=76;canvas.width=W;canvas.height=2600;
-    ctx.fillStyle='#f8f8f7';ctx.fillRect(0,0,W,canvas.height);
-    let y=margin;
-    ctx.fillStyle='#888';ctx.font='18px Arial, sans-serif';ctx.fillText('CHEN. / ARTIST INFORMATION',margin,y);y+=40;
-    const photo=card.querySelector('.comp-card-photo img');
-    if(photo?.src){
-      try{
-        const image=new Image();image.crossOrigin='anonymous';
-        await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=photo.src});
-        const maxW=W-2*margin,maxH=510,scale=Math.min(maxW/image.naturalWidth,maxH/image.naturalHeight);
-        const dw=image.naturalWidth*scale,dh=image.naturalHeight*scale;
-        ctx.drawImage(image,margin,y,dw,dh);y+=dh+38;
-      }catch(_){y+=12}
-    }
-    ctx.fillStyle='#222';ctx.font='38px Arial, "Noto Sans TC", sans-serif';
-    ctx.fillText(card.querySelector('.comp-card-name')?.textContent||'姜翊',margin,y);y+=40;
-    ctx.fillStyle='#666';ctx.font='20px Arial, "Noto Sans KR", sans-serif';
-    ctx.fillText(card.querySelector('.comp-card-names')?.textContent||'CHIANG YI．강익',margin,y);y+=44;
-    const groups=Array.from(card.querySelectorAll('.comp-card-group'));
-    function wrapCanvasText(txt,x,top,maxW){
-      ctx.font='17px Arial, "Noto Sans TC", "Noto Sans KR", sans-serif';
-      let line='',rows=0;
-      for(const char of String(txt||'')){
-        if(ctx.measureText(line+char).width>maxW&&line){ctx.fillText(line,x,top+rows*26);rows++;line=char}
-        else line+=char;
-      }
-      if(line){ctx.fillText(line,x,top+rows*26);rows++}
-      return Math.max(1,rows)*26;
-    }
-    const colW=(W-2*margin-38)/2,base=y,heights=[0,0];
-    groups.forEach((group,index)=>{
-      const column=index===1?1:0;
-      const x=margin+column*(colW+38);
-      let top=base+heights[column];
-      ctx.fillStyle='#999';ctx.font='17px Arial, sans-serif';
-      ctx.fillText((group.querySelector('h4')?.textContent||'').toUpperCase(),x,top);top+=34;
-      group.querySelectorAll('dl>div:not([hidden])').forEach(row=>{
-        const term=row.querySelector('dt')?.textContent||'',value=row.querySelector('dd')?.textContent||'';
-        ctx.fillStyle='#999';ctx.font='17px Arial, sans-serif';ctx.fillText(term,x,top);
-        ctx.fillStyle='#333';top+=wrapCanvasText(value,x+130,top,Math.max(70,colW-135))+13;
+    if(button){button.disabled=true;button.setAttribute("aria-busy","true")}
+    try{
+      if(document.fonts?.ready)await document.fonts.ready;
+      const photos=Array.from(card.querySelectorAll('img'));
+      await Promise.all(photos.map(img=>img.decode?.().catch(()=>{})||Promise.resolve()));
+      if(photos.some(img=>!img.complete||!img.naturalWidth))throw Error("形象照片尚未載入完成，請稍後再試。");
+      const html2canvas=await ensureCaptureLibrary();
+      const canvas=await html2canvas(card,{
+        backgroundColor:'#f8f8f7',
+        scale:Math.min(3,Math.max(2,window.devicePixelRatio||1)),
+        useCORS:true,
+        allowTaint:false,
+        logging:false,
+        scrollX:0,
+        scrollY:-window.scrollY,
+        onclone:doc=>{
+          const clonedCard=doc.querySelector('.comp-card');
+          if(!clonedCard)return;
+          for(const hidden of clonedCard.querySelectorAll('.comp-card-actions,.comp-card-export'))hidden.remove();
+        }
       });
-      heights[column]=top-base+26;
-    });
-    // Crop the export to the last visible line; keep the complete text on long cards.
-    const contentBottom=base+Math.max(...heights)+margin;
-    const cropped=document.createElement('canvas');
-    cropped.width=W;cropped.height=Math.min(canvas.height,Math.max(1100,Math.ceil(contentBottom)));
-    const target=cropped.getContext('2d');target.drawImage(canvas,0,0);
-    output.src=cropped.toDataURL('image/png');
-    download.href=output.src;
-    dialog.showModal();
+      if(!canvas.width||!canvas.height)throw Error("沒有可儲存的資料卡畫面");
+      const png=canvas.toDataURL('image/png');
+      output.src=png;download.href=png;
+      if(!dialog.open)dialog.showModal();
+    }finally{
+      if(button){button.disabled=false;button.removeAttribute("aria-busy")}
+    }
   }
   document.getElementById('model-card-image-button')?.addEventListener('click',()=>{
     makeModelCardImage().catch(()=>alert('圖片產生失敗，請重新整理再試。'));
