@@ -84,7 +84,7 @@ function validate(d){
   for(const group of [d.about,d.profile,d.contact,...d.works,...d.gallery]){
     if(!group||typeof group!=="object"||Array.isArray(group))return false;
     for(const [k,v] of Object.entries(group)){
-      if(["hero_image","photo","cover","image","model_card_pdf","resume_pdf","showreel_url","video_url","instagram","other_url"].includes(k)&&!validURL(v))return false;
+      if(["hero_image","hero_image_secondary","photo","cover","image","model_card_pdf","resume_pdf","showreel_url","video_url","instagram","other_url"].includes(k)&&!validURL(v))return false;
       if(typeof v==="string"&&!safeString(v,12000))return false;
       if(Array.isArray(v)&&v.length>100)return false;
       if(v!==null&&typeof v==="object"&&!Array.isArray(v))return false;
@@ -226,7 +226,7 @@ function stagedPath(value){
   return IMAGE_REF.test(path)?path:null;
 }
 function imageRefs(d){
-  const images=[d.about?.hero_image,d.profile?.photo];
+  const images=[d.about?.hero_image,d.about?.hero_image_secondary,d.profile?.photo];
   for(const w of d.works||[]){
     images.push(w.cover);
     for(const st of w.stills||[])images.push(st.image);
@@ -253,6 +253,7 @@ async function previewContent(session){
     return path?"/api/media/preview?path="+encodeURIComponent(path):value;
   };
   data.about.hero_image=rewrite(data.about.hero_image);
+  data.about.hero_image_secondary=rewrite(data.about.hero_image_secondary);
   data.profile.photo=rewrite(data.profile.photo);
   for(const w of data.works){
     w.cover=rewrite(w.cover);
