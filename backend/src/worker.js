@@ -96,6 +96,14 @@ function validate(d){
     if(w.stills!==undefined&&(!Array.isArray(w.stills)||w.stills.length>40||w.stills.some(x=>!x||typeof x!=="object"||!validURL(x.image)||!safeString(x.caption||"",500))))return false;
   }
   if(d.about.languages!==undefined&&(!Array.isArray(d.about.languages)||d.about.languages.length>12||d.about.languages.some(x=>!safeString(x,90))))return false;
+  if(d.contact.links!==undefined){
+    if(!Array.isArray(d.contact.links)||d.contact.links.length>30)return false;
+    for(const item of d.contact.links){
+      if(!item||typeof item!=="object"||Array.isArray(item)||!safeString(item.label,80)||!safeString(item.url,2048))return false;
+      if(item.url&&!validURL(item.url))return false;
+      if(item.url&&!item.url.startsWith("https://"))return false;
+    }
+  }
   return true;
 }
 async function auth(request,env){
