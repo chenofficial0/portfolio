@@ -24,7 +24,21 @@
     "skills_ko": "",
     "model_card_pdf": "",
     "resume_pdf": "",
-    "showreel_url": ""
+    "showreel_url": "",
+    "weight": "",
+    "bust": "",
+    "waist": "",
+    "hips": "",
+    "shoe_size": "",
+    "hair_color_zh": "",
+    "hair_color_en": "",
+    "hair_color_ko": "",
+    "eye_color_zh": "",
+    "eye_color_en": "",
+    "eye_color_ko": "",
+    "agency_zh": "無",
+    "agency_en": "None",
+    "agency_ko": "없음"
   },
   "contact": {
     "email": "clyichen0312@gmail.com",
