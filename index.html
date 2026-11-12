@@ -103,15 +103,21 @@
 
 /* CHEN. home portraits: 2 desktop / 1 mobile; preserve the photos' natural ratios. */
 .hero-carousel{position:relative;width:min(100%,660px)}
-.hero-images{display:flex;align-items:flex-start;justify-content:flex-start;gap:20px;width:100%;overflow:hidden;touch-action:pan-y}
+.hero-images{width:100%;overflow:hidden;touch-action:pan-y}
+.hero-strip{display:flex;align-items:flex-start;width:100%;will-change:transform;transform:translate3d(0,0,0)}
+.hero-strip.is-sliding{transition:transform .56s cubic-bezier(.22,1,.36,1)}
+.hero-page{display:flex;flex:0 0 100%;min-width:0;align-items:flex-start;justify-content:flex-start;gap:20px}
 .hero-images .hero-visual{flex:0 0 auto;max-width:100%;background:transparent;overflow:hidden}
 .hero-images .hero-visual img{display:block;width:100%;height:100%;object-fit:contain;object-position:left top}
 .hero-images .hero-visual.hero-empty,.hero-images .hero-visual.has-photo{background:transparent}
 .hero-images .hero-visual.has-photo .visual-note{display:none!important}
-.hero-carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:3;border:1px solid #dedede;background:#fffef2f2;background:rgba(255,255,255,.94);width:30px;height:38px;display:grid;place-items:center;font-size:21px;line-height:1;color:#222;cursor:pointer;padding:0}
-.hero-carousel-prev{left:8px}.hero-carousel-next{right:8px}
-.hero-carousel-arrow:disabled{opacity:.3;cursor:default}
+.hero-carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:3;border:0;background:transparent;width:32px;height:44px;display:grid;place-items:center;color:#333;cursor:pointer;padding:0;opacity:.72;transition:opacity .2s ease}
+.hero-carousel-arrow svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
+.hero-carousel-prev{left:-36px}.hero-carousel-next{right:-36px}
+.hero-carousel-arrow:not(:disabled):hover,.hero-carousel-arrow:not(:disabled):focus-visible{opacity:1}
+.hero-carousel-arrow:disabled{opacity:.2;cursor:default}
 .hero-carousel-arrow[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){.hero-strip.is-sliding{transition:none}.hero-carousel-arrow{transition:none}}
 .comp-card-photo.has-photo,.work-thumb:has(img),.cms-gallery img,.gallery-grid img,.detail-img,.detail-gallery img{background:transparent}
 .hero-copy{width:min(100%,660px)}
 .comp-card-photo img,.work-thumb img,.gallery-grid img,.cms-gallery img,.detail-img,.detail-gallery img{object-fit:contain}
@@ -119,10 +125,11 @@
 @media(max-width:700px){
   /* Fill the content column: image edge aligns with the name, page margins stay even. */
   .hero-carousel{width:100%}
-  .hero-images{width:100%;gap:0;justify-content:flex-start}
+  .hero-images{width:100%}
+  .hero-page{gap:0}
   .hero-images .hero-visual{max-width:100%;aspect-ratio:auto}
   .hero-carousel-arrow{width:28px;height:36px}
-  .hero-carousel-prev{left:6px}.hero-carousel-next{right:6px}
+  .hero-carousel-prev{left:3px}.hero-carousel-next{right:3px}
 }
 .hero .name-roman-ko{font-size:12px;line-height:1.7;letter-spacing:.035em;margin:2px 0 0;white-space:normal;overflow-wrap:anywhere}
 /* Desktop: align each section's content with its numbered heading, preserving width and columns. */
@@ -175,11 +182,11 @@
   <main id="main">
     <section id="home" class="hero wrap">
       <div class="hero-carousel" aria-label="首頁形象照片輪播">
-        <button type="button" class="hero-carousel-arrow hero-carousel-prev" aria-label="上一張形象照片" hidden>‹</button>
+        <button type="button" class="hero-carousel-arrow hero-carousel-prev" aria-label="上一張形象照片" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></button>
         <div class="hero-images" aria-live="off">
           <div class="hero-visual hero-empty"><span class="visual-note" data-i18n="portraitPending">PORTRAIT TO BE ADDED</span></div>
         </div>
-        <button type="button" class="hero-carousel-arrow hero-carousel-next" aria-label="下一張形象照片" hidden>›</button>
+        <button type="button" class="hero-carousel-arrow hero-carousel-next" aria-label="下一張形象照片" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></button>
       </div>
       <div class="hero-copy">
         <span class="eyebrow">ARTIST — TAIWAN</span>
@@ -401,58 +408,98 @@
   // Admin-managed content lives in content/site.json, not in this HTML file.
   const safeFile = (url) => typeof url === 'string' && url.trim() && isSafeUrl(url);
   const setText = (selector,text) => {const node=document.querySelector(selector);if(node && text!=null)node.textContent=String(text)};
-  // The first two portraits are still understood by older published site.json files.
-  let heroPortraitUrls=[],heroStartIndex=0;
+  // Build two full-width pages during motion so photos slide rather than pop in.
+  // Older content/site.json files with two fixed image fields remain supported.
+  let heroPortraitUrls=[],heroStartIndex=0,heroAnimating=false,heroAnimationToken=0;
   const heroMobile=()=>window.matchMedia('(max-width:700px)').matches;
-  function heroViewportCount(){return heroMobile()?1:2}
-  function showHeroPortraits(){
-    const track=document.querySelector('.hero-images'),root=document.querySelector('.hero-carousel');
-    if(!track||!root)return;
-    const visible=heroViewportCount(),maxStart=Math.max(0,heroPortraitUrls.length-visible);
-    heroStartIndex=Math.min(heroStartIndex,maxStart);
-    track.replaceChildren();
-    const selected=heroPortraitUrls.slice(heroStartIndex,heroStartIndex+visible);
-    if(!selected.length){
-      const fallback=document.createElement('div');fallback.className='hero-visual hero-empty';
+  const heroViewportCount=()=>heroMobile()?1:2;
+  const heroReducedMotion=()=>window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function createHeroPage(start){
+    const page=document.createElement('div');page.className='hero-page';
+    const urls=heroPortraitUrls.slice(start,start+heroViewportCount());
+    if(!urls.length){
+      const frame=document.createElement('div');frame.className='hero-visual hero-empty';
       const note=document.createElement('span');note.className='visual-note';note.textContent=i18n('portraitPending');
-      fallback.append(note);track.append(fallback);
+      frame.append(note);page.append(frame);return page;
     }
-    selected.forEach((url,index)=>{
+    urls.forEach((url,index)=>{
       const frame=document.createElement('div');frame.className='hero-visual has-photo';
-      const img=document.createElement('img');img.src=url;img.alt=(document.querySelector('.hero h1')?.textContent||'CHEN.')+' — '+(heroStartIndex+index+1);
-      img.loading=heroStartIndex+index<2?'eager':'lazy';
+      const img=document.createElement('img');
+      img.src=url;img.alt=(document.querySelector('.hero h1')?.textContent||'CHEN.')+' — '+(start+index+1);
+      img.loading='eager';img.decoding='async';
       img.addEventListener('load',resizeHeroPortraits,{once:true});
-      frame.append(img);track.append(frame);
+      frame.append(img);page.append(frame);
     });
-    const hasMore=heroPortraitUrls.length>visible;
+    return page;
+  }
+  function updateHeroArrows(){
+    const root=document.querySelector('.hero-carousel');
+    if(!root)return;
+    const visible=heroViewportCount(),max=Math.max(0,heroPortraitUrls.length-visible);
     const prev=root.querySelector('.hero-carousel-prev'),next=root.querySelector('.hero-carousel-next');
-    for(const arrow of [prev,next])arrow.hidden=!hasMore;
-    prev.disabled=heroStartIndex===0;
-    next.disabled=heroStartIndex===maxStart;
-    resizeHeroPortraits();
+    prev.hidden=next.hidden=heroPortraitUrls.length<=visible;
+    prev.disabled=heroAnimating||heroStartIndex===0;
+    next.disabled=heroAnimating||heroStartIndex===max;
   }
   function resizeHeroPortraits(){
-    const track=document.querySelector('.hero-images');
-    if(!track)return;
-    const frames=Array.from(track.querySelectorAll('.hero-visual'));
-    if(!frames.length||!track.clientWidth)return;
+    const viewport=document.querySelector('.hero-images');
+    if(!viewport||!viewport.clientWidth)return;
     const mobile=heroMobile(),gap=mobile?0:20;
-    const available=track.clientWidth-gap*(frames.length-1);
-    const ratios=frames.map(frame=>{
-      const img=frame.querySelector('img');
-      const value=img?.naturalWidth&&img?.naturalHeight?img.naturalWidth/img.naturalHeight:4/5;
-      return Math.max(.2,Math.min(5,value));
-    });
-    const height=mobile?available/ratios[0]:Math.min(400,available/ratios.reduce((a,b)=>a+b,0));
-    frames.forEach((frame,i)=>{
-      frame.style.width=Math.max(1,height*ratios[i]).toFixed(2)+'px';
-      frame.style.height=Math.max(1,height).toFixed(2)+'px';
+    viewport.querySelectorAll('.hero-page').forEach(page=>{
+      const frames=Array.from(page.querySelectorAll('.hero-visual'));
+      if(!frames.length)return;
+      const available=Math.max(1,viewport.clientWidth-gap*(frames.length-1));
+      const ratios=frames.map(frame=>{
+        const img=frame.querySelector('img');
+        const value=img?.naturalWidth&&img?.naturalHeight?img.naturalWidth/img.naturalHeight:4/5;
+        return Math.max(.2,Math.min(5,value));
+      });
+      const total=ratios.reduce((a,b)=>a+b,0);
+      const height=mobile?available/ratios[0]:Math.min(400,available/total);
+      frames.forEach((frame,i)=>{
+        frame.style.width=Math.max(1,height*ratios[i]).toFixed(2)+'px';
+        frame.style.height=Math.max(1,height).toFixed(2)+'px';
+      });
     });
   }
+  function showHeroPortraits(){
+    const viewport=document.querySelector('.hero-images');if(!viewport)return;
+    heroAnimationToken++;heroAnimating=false;
+    heroStartIndex=Math.min(heroStartIndex,Math.max(0,heroPortraitUrls.length-heroViewportCount()));
+    const strip=document.createElement('div');strip.className='hero-strip';
+    strip.append(createHeroPage(heroStartIndex));viewport.replaceChildren(strip);
+    resizeHeroPortraits();updateHeroArrows();
+  }
   function stepHero(direction){
+    if(heroAnimating||!direction)return;
     const max=Math.max(0,heroPortraitUrls.length-heroViewportCount());
-    heroStartIndex=Math.max(0,Math.min(max,heroStartIndex+direction));
-    showHeroPortraits();
+    const target=Math.max(0,Math.min(max,heroStartIndex+direction));
+    if(target===heroStartIndex)return;
+    if(heroReducedMotion()){heroStartIndex=target;showHeroPortraits();return}
+    const viewport=document.querySelector('.hero-images'),strip=viewport?.querySelector('.hero-strip');
+    if(!strip)return;
+    const token=++heroAnimationToken;heroAnimating=true;updateHeroArrows();
+    const incoming=createHeroPage(target);
+    if(direction>0)strip.append(incoming);
+    else strip.prepend(incoming);
+    strip.classList.remove('is-sliding');
+    strip.style.transform=direction>0?'translate3d(0,0,0)':'translate3d(-100%,0,0)';
+    resizeHeroPortraits();
+    // Wait for the starting position to paint before applying the animated offset.
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if(token!==heroAnimationToken)return;
+      strip.classList.add('is-sliding');
+      strip.style.transform=direction>0?'translate3d(-100%,0,0)':'translate3d(0,0,0)';
+    }));
+    let finished=false;
+    const finish=()=>{
+      if(finished||token!==heroAnimationToken)return;
+      finished=true;heroStartIndex=target;showHeroPortraits();
+    };
+    strip.addEventListener('transitionend',event=>{
+      if(event.target===strip&&event.propertyName==='transform')finish();
+    });
+    setTimeout(finish,800); // Browser fallback if transitionend is not fired.
   }
   document.querySelector('.hero-carousel-prev')?.addEventListener('click',()=>stepHero(-1));
   document.querySelector('.hero-carousel-next')?.addEventListener('click',()=>stepHero(1));
@@ -469,6 +516,15 @@
     heroTouchX=null;heroTouchY=null;
     if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.2)stepHero(dx<0?1:-1);
   },{passive:true});
+  let mouseHeroX=null;
+  heroTrack?.addEventListener('pointerdown',event=>{
+    if(event.pointerType==='mouse'&&event.button===0)mouseHeroX=event.clientX;
+  });
+  heroTrack?.addEventListener('pointerup',event=>{
+    if(event.pointerType!=='mouse'||mouseHeroX===null)return;
+    const dx=event.clientX-mouseHeroX;mouseHeroX=null;
+    if(Math.abs(dx)>50)stepHero(dx<0?1:-1);
+  });
   let lastHeroMobile=heroMobile();
   window.addEventListener('resize',()=>{
     if(lastHeroMobile!==heroMobile()){lastHeroMobile=heroMobile();showHeroPortraits()}
@@ -478,6 +534,8 @@
     const urls=Array.isArray(about.hero_images)
       ?about.hero_images.map(item=>typeof item==='string'?item:item?.image).filter(safeFile).slice(0,30)
       :[about.hero_image,about.hero_image_secondary].filter(safeFile);
+    const changed=urls.length!==heroPortraitUrls.length||urls.some((url,i)=>url!==heroPortraitUrls[i]);
+    if(!changed)return;
     heroPortraitUrls=urls;heroStartIndex=0;showHeroPortraits();
   }
   const mediaImage = (selector,url,alt) => {
