@@ -68,7 +68,16 @@
       "cover": "https://chenofficial0.github.io/portfolio/assets/uploads/chen-work-cover-2026-11-12-ktECV3daib3_SiTo.jpg"
     }
   ],
-  "gallery": [],
+  "gallery": [
+    {
+      "image": "https://chenofficial0.github.io/portfolio/assets/uploads/chen-gallery-2026-11-12-L3iuX_fLkxzQGYQK.jpg",
+      "caption_zh": ""
+    },
+    {
+      "image": "",
+      "caption_zh": ""
+    }
+  ],
   "contact": {
     "email": "clyichen0312@gmail.com",
     "instagram": "https://www.instagram.com/c.yichen___?rpxt=YnBqcmR1MTJqeTRr&utm_source=qr",
