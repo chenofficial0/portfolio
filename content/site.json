@@ -18,7 +18,7 @@
     "hero_image_secondary": "https://chenofficial0.github.io/portfolio/assets/uploads/chen-hero-2026-11-12-gM90jFk7Evu97tck.jpg"
   },
   "profile": {
-    "photo": "",
+    "photo": "https://chenofficial0.github.io/portfolio/assets/uploads/chen-profile-2026-11-12-mragG3nnw0NgdAUw.jpg",
     "height": "155",
     "skills_zh": "",
     "skills_en": "",
@@ -39,7 +39,8 @@
     "eye_color_ko": "",
     "agency_zh": "無",
     "agency_en": "None",
-    "agency_ko": "없음"
+    "agency_ko": "없음",
+    "links": []
   },
   "works": [],
   "gallery": [],
