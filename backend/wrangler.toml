@@ -12,6 +12,8 @@ id = "f5115459b9a0488186850f92f1ee8cfc"
 [vars]
 # Worker remains read-only until security tests and explicit approval.
 ENABLE_CONTENT_WRITES = "false"
+# Leave disabled until image endpoint and publishing permissions pass security tests.
+ENABLE_MEDIA_UPLOADS = "false"
 # Must match the exact deployed API origin, e.g. https://chen-content-studio-api.YOUR-SUBDOMAIN.workers.dev
 PUBLIC_API_ORIGIN = "https://chen-content-studio-api.clyichen0312.workers.dev"
 GITHUB_CLIENT_ID = "Ov23lidWfrNSvOTLZnoC"
