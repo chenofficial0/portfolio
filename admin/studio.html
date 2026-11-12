@@ -339,7 +339,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
   // All existing _zh/_en/_ko JSON keys remain untouched.
   function translatedField(obj,group){
     const wrap=el("section","translated-field");
-    const title=el("div","translated-field-title",group[0][1].replace(/（(?:中文|英文|韓文)）/g,""));
+    const title=el("div","translated-field-title",group[0][1].replace(/（(?:中文|英文|韓文)）/g,"").replace(/^(?:中文|英文|韓文)/,""));
     const tabs=el("div","translated-tabs");
     tabs.setAttribute("role","group");tabs.setAttribute("aria-label",title.textContent+" 語言切換");
     const content=el("div","translated-content");
