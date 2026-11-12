@@ -75,6 +75,9 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
 [hidden]{display:none!important}
 @media(max-width:850px){.layout{grid-template-columns:1fr}.sidebar{position:static;height:auto;padding:20px 18px;border-bottom:1px solid var(--line);border-right:0}.brand{font-size:23px}.brand-sub{margin-top:3px}.nav{margin:18px -4px 0;display:flex;overflow-x:auto;gap:3px}.nav button{width:auto;white-space:nowrap;padding:10px}.nav small,.side-foot{display:none}.content{width:calc(100% - 38px)}.topbar{height:auto;min-height:77px;padding:13px 0}.hero{padding:38px 0 33px}.form-grid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.cards{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-direction:column;gap:9px}.entry{align-items:flex-start;flex-direction:column}.content{width:calc(100% - 30px)}.panel{padding:23px 0}.collection-editor{padding:14px}}
+.profile-resource-control{min-width:0;display:grid;gap:10px}
+.profile-resource-control .field{min-width:0}
+.profile-resource-control input[type=file]{padding:9px;font-size:11px}
 </style>
 </head>
 <body>
@@ -207,7 +210,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       const parsed=new URL(url);
       if(parsed.hostname!=="chenofficial0.github.io")return "";
       const path=parsed.pathname.replace(/^\/portfolio\//,"");
-      if(!/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg$/.test(path))return "";
+      if(!(/^(?:assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg|assets\/uploads\/chen-resource-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.(?:pdf|jpg|png))$/.test(path)))return "";
       return "/api/media/preview?path="+encodeURIComponent(path);
     }catch(_){return ""}
   }
@@ -385,11 +388,78 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     }
     container.append(grid);
   }
+  const stagedResourceFiles=new WeakMap();
+  function resourceInput(item){
+    const wrap=el("div","profile-resource-control");
+    const typeField=el("div","field"),label=el("label","","資料類型");
+    const type=document.createElement("select");
+    for(const [value,title] of [["url","外部連結"],["pdf","PDF 文件"],["jpg","JPG 圖片"],["png","PNG 圖片"]]){
+      const option=document.createElement("option");option.value=value;option.textContent=title;type.append(option);
+    }
+    const inferred=/\.pdf(?:\?|$)/i.test(item.url||"")?"pdf":/\.png(?:\?|$)/i.test(item.url||"")?"png":/\.jpe?g(?:\?|$)/i.test(item.url||"")?"jpg":"url";
+    type.value=item.kind||inferred;typeField.append(label,type);wrap.append(typeField);
+    const source=el("div","field");wrap.append(source);
+    function renderSource(){
+      source.replaceChildren();
+      if(type.value==="url"){
+        source.append(fieldRow(item,["url","HTTPS 網址"]));return;
+      }
+      const picker=document.createElement("input");picker.type="file";
+      picker.accept={pdf:".pdf,application/pdf",jpg:".jpg,.jpeg,image/jpeg",png:".png,image/png"}[type.value];
+      picker.setAttribute("aria-label","選擇要上傳的"+type.value.toUpperCase()+"檔案");
+      const status=el("small","",item.url?"目前已設定檔案（可重新上傳）":"尚未選取檔案");
+      const upload=btn("上傳檔案至測試分支",async()=>{
+        const file=stagedResourceFiles.get(item);if(!file||!apiSession?.canUpload)return;
+        if(!confirm("測試分支屬於公開 GitHub 儲存庫，上傳後可能被他人讀取。確認已取得公開權利並上傳？"))return;
+        upload.disabled=true;status.textContent="上傳中…";
+        try{
+          const base64=await new Promise((resolve,reject)=>{
+            const reader=new FileReader();
+            reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");
+            reader.onerror=()=>reject(Error("無法讀取檔案"));
+            reader.readAsDataURL(file);
+          });
+          const mime={pdf:"application/pdf",jpg:"image/jpeg",png:"image/png"}[type.value];
+          const response=await fetch("/api/media/resource",{
+            method:"POST",credentials:"same-origin",
+            headers:{"content-type":"application/json","x-chen-csrf":apiSession.csrf},
+            body:JSON.stringify({mime,base64})
+          });
+          const result=await response.json();
+          if(!response.ok)throw Error(result.error||"上傳失敗");
+          item.url=result.url;item.kind=type.value;markDirty();
+          stagedResourceFiles.delete(item);picker.value="";
+          status.textContent="上傳成功，請按「儲存草稿」保存連結。";
+          renderSource();
+        }catch(error){status.textContent="上傳失敗："+error.message;upload.disabled=false}
+      },"btn dark");
+      upload.disabled=!apiSession?.canUpload||!stagedResourceFiles.has(item);
+      picker.addEventListener("change",()=>{
+        const file=picker.files?.[0];if(!file)return;
+        const mime={pdf:"application/pdf",jpg:"image/jpeg",png:"image/png"}[type.value];
+        if(file.type!==mime||file.size>4194304||file.size<100){
+          status.textContent="只支援所選格式且檔案必須小於 4 MB";picker.value="";upload.disabled=true;return;
+        }
+        stagedResourceFiles.set(item,file);upload.disabled=!apiSession?.canUpload;
+        status.textContent="已選擇："+file.name+"，尚未上傳";
+      });
+      source.append(el("label","","選擇檔案"),picker,status,upload);
+      if(item.url){
+        const link=el("a","toolbar-note","查看目前檔案");
+        link.href=stagedImagePreviewURL(item.url)||item.url;link.target="_blank";link.rel="noopener noreferrer";source.append(link);
+      }
+    }
+    type.addEventListener("change",()=>{
+      if(item.url&&!confirm("切換資料類型會清除原有連結，確定嗎？")){type.value=item.kind||inferred;return}
+      item.kind=type.value;item.url="";stagedResourceFiles.delete(item);markDirty();renderSource();
+    });
+    renderSource();return wrap;
+  }
   function profileLinkEditor(){
     const box=el("section","contact-channel-editor");
     const head=el("div","panel-title");
     head.append(el("h2","","自訂資料連結"),el("span","","最多 30 筆・可自行排序"));box.append(head);
-    box.append(el("p","toolbar-note","為每個按鈕設定名稱及 HTTPS 網址；只有名稱與網址都填寫後，才會顯示在 PROFILE 資料卡。"));
+    box.append(el("p","toolbar-note","每筆資料可選擇外部連結、PDF、JPG 或 PNG（4 MB 以內），檔案上傳測試分支後，請再儲存草稿。"));
     if(!Array.isArray(data.profile.links))data.profile.links=[];
     const list=el("div","contact-channel-list");box.append(list);
     const refresh=()=>{
@@ -397,7 +467,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       data.profile.links.forEach((item,i)=>{
         const row=el("div","contact-channel-row");
         const name=fieldRow(item,["label","連結顯示名稱"]);
-        const url=fieldRow(item,["url","HTTPS 網址"]);
+        const url=resourceInput(item);
         const actions=el("div","entry-actions");
         const up=btn("↑",()=>{if(i<1)return;[data.profile.links[i-1],data.profile.links[i]]=[data.profile.links[i],data.profile.links[i-1]];markDirty();refresh()});
         up.disabled=i===0;up.setAttribute("aria-label","上移連結");
@@ -410,7 +480,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     };
     const add=btn("＋ 新增資料連結",()=>{
       if(data.profile.links.length>=30){alert("最多 30 筆資料連結");return}
-      data.profile.links.push({label:"",url:""});markDirty();refresh();
+      data.profile.links.push({label:"",kind:"url",url:""});markDirty();refresh();
     },"btn dark");
     box.append(add);refresh();return box;
   }
@@ -539,15 +609,20 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       reviewPanel.replaceChildren(el("h2","","正式發布檢查"));
       reviewPanel.append(el("p","","此次發布將以 GitHub 測試分支的最新草稿為準，照片和網站資料會在一次 GitHub 提交中同步。"));
       reviewPanel.append(el("p","","異動內容："+(plan.sections.length?plan.sections.join("、"):"無內容變更")+"。"));
-      reviewPanel.append(el("p","","照片檔案數："+plan.mediaCount+"。圖片一旦發布至正式網站，即可能被搜尋引擎存取。"));
+      reviewPanel.append(el("p","","待發布附件數："+plan.mediaCount+"。所有照片與文件一旦發布至正式網站，即可能被搜尋引擎存取。"));
       if(plan.media.length){
-        const heading=el("p","","請確認以下照片均可公開使用，且版面與人物呈現符合預期：");
+        const heading=el("p","","請確認以下照片、PDF 與其他附件均可公開使用，且版面與人物呈現符合預期：");
         const mediaGrid=el("div","release-media");
         for(const path of plan.media){
-          const fig=document.createElement("figure"),img=document.createElement("img");
-          img.loading="lazy";img.alt="待發布的照片";
-          img.src="/api/media/preview?path="+encodeURIComponent(path);
-          fig.append(img,el("figcaption","",path.split("/").pop()));mediaGrid.append(fig);
+          const fig=document.createElement("figure"),url="/api/media/preview?path="+encodeURIComponent(path);
+          if(path.endsWith(".pdf")){
+            const pdf=el("a","comp-card-button","檢視 PDF 文件");
+            pdf.href=url;pdf.target="_blank";pdf.rel="noopener noreferrer";fig.append(pdf);
+          }else{
+            const img=document.createElement("img");
+            img.loading="lazy";img.alt="待發布的照片";img.src=url;fig.append(img);
+          }
+          fig.append(el("figcaption","",path.split("/").pop()));mediaGrid.append(fig);
         }
         reviewPanel.append(heading,mediaGrid);
       }
