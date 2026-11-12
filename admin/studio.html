@@ -178,6 +178,16 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     if(previous){URL.revokeObjectURL(previous.url);activePhotoURLs.delete(previous.url);cache.delete(key)}
   }
   window.addEventListener("pagehide",()=>{for(const url of activePhotoURLs)URL.revokeObjectURL(url);activePhotoURLs.clear()});
+  function stagedImagePreviewURL(url){
+    if(!isWorkerHost||!apiSession||typeof url!=="string")return "";
+    try{
+      const parsed=new URL(url);
+      if(parsed.hostname!=="chenofficial0.github.io")return "";
+      const path=parsed.pathname.replace(/^\/portfolio\//,"");
+      if(!/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg$/.test(path))return "";
+      return "/api/media/preview?path="+encodeURIComponent(path);
+    }catch(_){return ""}
+  }
   function createPhotoEditor(obj,key,label){
     const wrap=el("div","field full");
     wrap.append(el("label","",label));
@@ -224,7 +234,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     function showPhoto(){
       const local=localPhotos.get(obj)?.get(key);
       if(local){preview.src=local.url;preview.hidden=false;status.textContent=local.uploaded?"已上傳測試分支，尚待正式發布。":"本機照片已選擇並壓縮（"+(local.blob.size/1024).toFixed(0)+" KB）。尚未上傳；切換編輯區域仍可預覽，重新整理後會消失。"}
-      else if(obj[key]){preview.src=obj[key];preview.hidden=false;status.textContent="目前顯示已設定的圖片網址／路徑。"}
+      else if(obj[key]){preview.src=stagedImagePreviewURL(obj[key])||obj[key];preview.hidden=false;status.textContent="目前顯示已設定的圖片網址。測試分支照片透過登入後的預覽服務讀取，尚未發布至正式網站。"}
       else{preview.removeAttribute("src");preview.hidden=true;status.textContent="尚未選取照片。本機預覽不會自動儲存或發布。"}
     }
     showPhoto();
