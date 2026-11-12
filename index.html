@@ -53,6 +53,13 @@
 .comp-card-note{color:#a0a0a0;font-size:10px;margin:12px 0 0}
 @media(max-width:700px){.comp-card{padding:16px}.comp-card-content{padding:22px 0 4px}.comp-card-photo{aspect-ratio:4/3}.comp-card-facts>div{grid-template-columns:102px 1fr;gap:8px}.comp-card-actions{gap:8px}.comp-card-button{padding:9px 11px}}
 
+
+/* Persistent navigation: keep the original minimal layout and its mobile navigation. */
+.masthead{position:sticky;top:0;z-index:1000;background:#fff;isolation:isolate}
+.masthead::before{content:"";position:absolute;inset:0 calc(50% - 50vw);background:#fff;border-bottom:1px solid var(--rule);z-index:-1;pointer-events:none}
+.section{scroll-margin-top:125px}
+#home{scroll-margin-top:105px}
+@media(max-width:700px){.section{scroll-margin-top:160px}#home{scroll-margin-top:145px}.masthead{background:#fff}}
 </style>
   
 </head>
