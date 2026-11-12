@@ -609,15 +609,20 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       reviewPanel.replaceChildren(el("h2","","正式發布檢查"));
       reviewPanel.append(el("p","","此次發布將以 GitHub 測試分支的最新草稿為準，照片和網站資料會在一次 GitHub 提交中同步。"));
       reviewPanel.append(el("p","","異動內容："+(plan.sections.length?plan.sections.join("、"):"無內容變更")+"。"));
-      reviewPanel.append(el("p","","照片檔案數："+plan.mediaCount+"。圖片一旦發布至正式網站，即可能被搜尋引擎存取。"));
+      reviewPanel.append(el("p","","待發布附件數："+plan.mediaCount+"。所有照片與文件一旦發布至正式網站，即可能被搜尋引擎存取。"));
       if(plan.media.length){
-        const heading=el("p","","請確認以下照片均可公開使用，且版面與人物呈現符合預期：");
+        const heading=el("p","","請確認以下照片、PDF 與其他附件均可公開使用，且版面與人物呈現符合預期：");
         const mediaGrid=el("div","release-media");
         for(const path of plan.media){
-          const fig=document.createElement("figure"),img=document.createElement("img");
-          img.loading="lazy";img.alt="待發布的照片";
-          img.src="/api/media/preview?path="+encodeURIComponent(path);
-          fig.append(img,el("figcaption","",path.split("/").pop()));mediaGrid.append(fig);
+          const fig=document.createElement("figure"),url="/api/media/preview?path="+encodeURIComponent(path);
+          if(path.endsWith(".pdf")){
+            const pdf=el("a","comp-card-button","檢視 PDF 文件");
+            pdf.href=url;pdf.target="_blank";pdf.rel="noopener noreferrer";fig.append(pdf);
+          }else{
+            const img=document.createElement("img");
+            img.loading="lazy";img.alt="待發布的照片";img.src=url;fig.append(img);
+          }
+          fig.append(el("figcaption","",path.split("/").pop()));mediaGrid.append(fig);
         }
         reviewPanel.append(heading,mediaGrid);
       }
