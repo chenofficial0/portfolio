@@ -466,6 +466,7 @@
       heights[column]=top-base+26;
     });
     // Crop the export to the last visible line; keep the complete text on long cards.
+    const contentBottom=base+Math.max(...heights)+margin;
     const cropped=document.createElement('canvas');
     cropped.width=W;cropped.height=Math.min(canvas.height,Math.max(1100,Math.ceil(contentBottom)));
     const target=cropped.getContext('2d');target.drawImage(canvas,0,0);
