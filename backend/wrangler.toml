@@ -1,0 +1,19 @@
+name = "chen-content-studio-api"
+main = "src/worker.js"
+compatibility_date = "2026-11-12"
+workers_dev = true
+
+# Fill in actual KV namespace ID before deploying.
+# Create it with: npx wrangler kv namespace create STUDIO_KV
+[[kv_namespaces]]
+binding = "STUDIO_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+[vars]
+# Must match the exact deployed API origin, e.g. https://chen-content-studio-api.YOUR-SUBDOMAIN.workers.dev
+PUBLIC_API_ORIGIN = "https://REPLACE_WITH_YOUR_WORKER_ORIGIN"
+GITHUB_CLIENT_ID = "REPLACE_WITH_GITHUB_OAUTH_CLIENT_ID"
+
+# Secrets (set with wrangler secret put; NEVER commit them):
+# GITHUB_CLIENT_SECRET
+# SESSION_ENCRYPTION_KEY  (base64-encoded 32 random bytes)
