@@ -155,7 +155,11 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     ["stills","作品劇照","photoList"]
   ];
   const galleryFields=[
-    ["image","攝影相簿照片","photo"],["caption_zh","中文說明"],["caption_en","英文說明"],["caption_ko","韓文說明"]
+    ["image","攝影相簿照片","photo"],
+    ["title_zh","照片標題（中文）"],["title_en","照片標題（英文）"],["title_ko","照片標題（韓文）"],
+    ["year","拍攝年份（可選填）","number"],
+    ["description_zh","照片介紹（中文）","textarea"],["description_en","照片介紹（英文）","textarea"],["description_ko","照片介紹（韓文）","textarea"],
+    ["caption_zh","既有照片說明（中文，可保留）"],["caption_en","既有照片說明（英文，可保留）"],["caption_ko","既有照片說明（韓文，可保留）"]
   ];
   const view=document.getElementById("view");
   const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n};
@@ -625,7 +629,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       const order=arr.map((x,i)=>({x,i}));if(isWork)order.sort((a,b)=>(Number(b.x.year)||0)-(Number(a.x.year)||0));
       for(const {x,i} of order){
         const row=el("div","entry"),info=el("div","entry-info");
-        info.append(el("div","entry-title",(isWork?x.title_zh:x.caption_zh)||"未命名"));
+        info.append(el("div","entry-title",(isWork?x.title_zh:(x.title_zh||x.caption_zh))||"未命名"));
         info.append(el("div","entry-sub",isWork?String(x.year||"")+" · "+String(x.category||"")+" · "+(x.visible===false?"未公開":"公開"):String(x.image||"尚未設定圖片")));
         const actions=el("div","entry-actions");
         actions.append(btn(selected===i?"收起":"編輯",()=>{selected=selected===i?null:i;renderMain()}));
