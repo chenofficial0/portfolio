@@ -146,7 +146,7 @@ async function getContent(session){
   return json({data:JSON.parse(text),sha:raw.sha});
 }
 async function saveContent(request,session,env){
-  if(env.ENABLE_CONTENT_WRITES!=="true")return fail("Content writes are disabled pending security approval",403);
+  if(env.ENABLE_DRAFT_SAVES!=="true")return fail("Draft saves are disabled until reviewed",403);
   if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
   const length=Number(request.headers.get("content-length")||0);
   if(length>262144)return fail("Payload too large",413);
@@ -157,7 +157,7 @@ async function saveContent(request,session,env){
   try{
     const response=await github("/repos/"+REPO+"/contents/"+CONTENT_PATH,session.token,{
       method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-        message:"Update CHEN. website content via Content Studio",
+        message:"Save CHEN. Content Studio draft (not live)",
         content:encoded,sha:input.sha,branch:CONTENT_BRANCH
       })
     });
@@ -231,7 +231,7 @@ export default {
         r.headers.append("set-cookie",cookie("chen_session","",0));return r;
       }
       const s=await session(request,env);
-      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_CONTENT_WRITES==="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true"}:{authenticated:false,canPublish:false,canUpload:false});
+      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:false,canSave:env.ENABLE_DRAFT_SAVES==="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true"}:{authenticated:false,canPublish:false,canSave:false,canUpload:false});
       if(!s)return fail("Sign in with approved GitHub account",401);
       if(method==="GET"&&path==="/api/content")return getContent(s);
       if(method==="POST"&&path==="/api/media/image"){
