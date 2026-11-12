@@ -124,7 +124,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     ["skills_zh","專長（中文）"],["skills_en","專長（英文）"],["skills_ko","專長（韓文）"],
     ["model_card_pdf","模特卡 PDF 路徑"],["resume_pdf","演員履歷 PDF 路徑"],["showreel_url","演出影片連結"]
   ];
-  const contactFields=[["email","工作信箱","email"],["instagram","Instagram 連結"],["other_url","其他社群連結"]];
+  const contactFields=[["email","工作信箱","email"],["instagram","Instagram 連結"]];
   const workFields=[
     ["title_zh","作品名稱（中文）"],["title_en","作品名稱（英文）"],["title_ko","作品名稱（韓文）"],
     ["year","年份","number"],["production","製作公司 / 品牌"],
@@ -328,6 +328,27 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     return wrapper;
   }
   function fields(container,obj,defs){const grid=el("div","form-grid");defs.forEach(f=>grid.append(fieldRow(obj,f)));container.append(grid)}
+  function contactLinkEditor(){
+    const box=el("section","contact-channel-editor");
+    const head=el("div","panel-title");head.append(el("h2","","自訂聯絡管道"),el("span","","可新增最多 30 筆"));box.append(head);
+    box.append(el("p","toolbar-note","填入顯示名稱與 HTTPS 連結，儲存草稿後會在網站 CONTACT 依序顯示。"));
+    if(!Array.isArray(data.contact.links))data.contact.links=[];
+    const list=el("div","contact-channel-list");box.append(list);
+    const refresh=()=>{
+      list.replaceChildren();
+      for(const [i,item] of data.contact.links.entries()){
+        const row=el("div","contact-channel-row");
+        const name=fieldRow(item,["label","顯示名稱（例：Threads、YouTube、經紀聯絡）"]);
+        const url=fieldRow(item,["url","連結網址（https://…）"]);
+        const del=btn("刪除",()=>{if(!confirm("確定刪除此聯絡管道？"))return;data.contact.links.splice(i,1);markDirty();refresh()});
+        row.append(name,url,del);list.append(row);
+      }
+    };
+    const add=btn("＋ 新增聯絡管道",()=>{
+      if(data.contact.links.length>=30){alert("最多只能新增 30 筆聯絡管道。");return}
+      data.contact.links.push({label:"",url:""});markDirty();refresh();
+    },"btn dark");box.append(add);refresh();return box;
+  }
   function panel(title,desc){const p=el("section","panel");const head=el("div","panel-title");head.append(el("h2","",title),el("span","",desc));p.append(head);return p}
   function renderMain(){
     const d=pages[current];document.getElementById("page-tag").textContent=d[0];
@@ -339,6 +360,10 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       const defs=current==="about"?aboutFields:current==="profile"?profileFields:contactFields;
       const p=panel(d[1],"資料變更不會自動發布");
       fields(p,data[current],defs);
+      if(current==="contact"){
+        p.append(contactLinkEditor());
+        if(data.contact.other_url)p.append(fieldRow(data.contact,["other_url","既有其他社群連結（舊欄位）"]));
+      }
       const t=el("div","toolbar");t.style.marginTop="25px";t.append(el("span","toolbar-note","編輯完成後請匯出 JSON，備份你的修改。"),btn("匯出修改檔案",exportJSON));p.append(t);view.append(p);return;
     }
     renderCollection();
