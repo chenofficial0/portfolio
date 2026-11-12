@@ -164,6 +164,37 @@ async function saveContent(request,session,env){
     return json({ok:true,sha:response.content?.sha||null,commit:response.commit?.sha||null});
   }catch(e){return fail([409,422].includes(e.http)?"Website content may have changed; reload before publishing":"GitHub publish failed",[409,422].includes(e.http)?409:502)}
 }
+
+function parseImageRequest(payload){
+  if(!payload||payload.filename!=="hero.jpg"||payload.mime!=="image/jpeg"||typeof payload.base64!=="string")return null;
+  // Maximum decoded size: 1.5 MiB. Strict base64 allows only binary JPEG payloads.
+  if(payload.base64.length>2100000||!/^[A-Za-z0-9+/]+={0,2}$/.test(payload.base64))return null;
+  let bytes;try{const bin=atob(payload.base64);bytes=Uint8Array.from(bin,ch=>ch.charCodeAt(0));}catch(_){return null}
+  if(bytes.length<100||bytes.length>1572864)return null;
+  if(bytes[0]!==0xff||bytes[1]!==0xd8||bytes[bytes.length-2]!==0xff||bytes[bytes.length-1]!==0xd9)return null;
+  return payload.base64;
+}
+async function uploadHeroPhoto(request,s,env){
+  // Dedicated write gate. Never upload images or change the live branch while testing.
+  if(env.ENABLE_MEDIA_UPLOADS!=="true")return fail("Media uploads are disabled pending security testing",403);
+  if(request.headers.get("x-chen-csrf")!==s.csrf)return fail("Invalid CSRF token",403);
+  const length=Number(request.headers.get("content-length")||0);
+  if(length>2200000)return fail("Image upload is too large",413);
+  const body=await request.text();
+  if(body.length>2200000)return fail("Image upload is too large",413);
+  let payload;try{payload=JSON.parse(body)}catch(_){return fail("Invalid image request")}
+  const encoded=parseImageRequest(payload);
+  if(!encoded)return fail("Invalid JPEG image or file size",422);
+  const filename="assets/uploads/hero-"+new Date().toISOString().slice(0,10)+"-"+random().slice(0,16)+".jpg";
+  try{
+    const response=await github("/repos/"+REPO+"/contents/"+filename,s.token,{
+      method:"PUT",headers:{"content-type":"application/json"},
+      body:JSON.stringify({message:"Upload CHEN. hero image (test branch)",content:encoded,branch:CONTENT_BRANCH})
+    });
+    return json({ok:true,path:filename,url:"https://chenofficial0.github.io/portfolio/"+filename,commit:response.commit?.sha||null});
+  }catch(_){return fail("Unable to upload photo to GitHub test branch",502)}
+}
+
 async function studio(env){
   const upstream=await fetch(PUBLIC_STUDIO,{headers:{"Cache-Control":"no-cache"}});
   if(!upstream.ok)return fail("Studio page has not deployed yet",503);
@@ -194,9 +225,13 @@ export default {
         r.headers.append("set-cookie",cookie("chen_session","",0));return r;
       }
       const s=await session(request,env);
-      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_CONTENT_WRITES==="true"}:{authenticated:false,canPublish:false});
+      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_CONTENT_WRITES==="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true"}:{authenticated:false,canPublish:false,canUpload:false});
       if(!s)return fail("Sign in with approved GitHub account",401);
       if(method==="GET"&&path==="/api/content")return getContent(s);
+      if(method==="POST"&&path==="/api/media/hero"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return uploadHeroPhoto(request,s,env);
+      }
       if(method==="PUT"&&path==="/api/content"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return saveContent(request,s,env);
