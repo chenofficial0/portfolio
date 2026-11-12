@@ -92,6 +92,19 @@
 .cms-gallery figure{margin:0}
 .cms-gallery img{width:100%;aspect-ratio:4/5;object-fit:cover;background:var(--soft)}
 .cms-gallery figcaption{font-size:10px;color:#888;margin-top:9px}
+.cms-gallery .gallery-photo-button{display:block;width:100%;border:0;background:none;padding:0;margin:0;text-align:left;cursor:zoom-in;color:inherit;font:inherit}
+.cms-gallery .gallery-photo-button:focus-visible{outline:1px solid #777;outline-offset:4px}
+.gallery-photo-dialog{border:0;padding:0;background:#fff;color:#222;width:min(920px,calc(100% - 34px));max-height:92dvh;overflow:auto;box-shadow:0 18px 80px #0002}
+.gallery-photo-dialog::backdrop{background:rgba(0,0,0,.72)}
+.gallery-photo-close{position:sticky;top:0;float:right;z-index:2;background:#fff;border:0;width:42px;height:42px;font:300 25px/1 sans-serif;cursor:pointer;color:#333}
+.gallery-photo-stage{clear:both;display:flex;justify-content:center;align-items:center;padding:0 24px;min-height:180px}
+.gallery-photo-stage img{display:block;width:auto;max-width:100%;height:auto;max-height:65dvh;object-fit:contain}
+.gallery-photo-info{padding:22px 28px 29px;border-top:1px solid #eee;margin-top:20px}
+.gallery-photo-info h3{font-size:16px;font-weight:400;letter-spacing:.02em;margin:0 0 8px}
+.gallery-photo-year{font-size:11px;color:#888;margin:0 0 12px}
+.gallery-photo-description{font-size:12px;line-height:1.9;color:#555;white-space:pre-line;margin:0}
+.gallery-photo-info [hidden]{display:none!important}
+@media(max-width:700px){.gallery-photo-dialog{width:calc(100% - 22px);max-height:90dvh}.gallery-photo-stage{padding:0 12px}.gallery-photo-stage img{max-height:58dvh}.gallery-photo-info{padding:18px 18px 23px}}
 .cms-social-link{font-size:12px;overflow-wrap:anywhere}
 .cms-meta-note{font-size:10px;color:var(--dim);margin-top:8px}
 @media(max-width:700px){.cms-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}}
@@ -306,6 +319,15 @@
       <a id="model-card-image-download" class="comp-card-button" href="#" download="CHEN-actor-card.png">下載 PNG 圖片</a>
       <button type="button" id="model-card-share-button" class="comp-card-button" hidden>分享／儲存至照片</button>
       <a id="model-card-image-open" class="comp-card-button" href="#" target="_blank" rel="noopener noreferrer">另開圖片</a>
+    </div>
+  </dialog>
+  <dialog id="gallery-photo-dialog" class="gallery-photo-dialog" aria-label="攝影作品照片詳情">
+    <button type="button" class="gallery-photo-close" aria-label="關閉照片詳情">×</button>
+    <div class="gallery-photo-stage"><img id="gallery-photo-large" alt=""></div>
+    <div class="gallery-photo-info">
+      <h3 id="gallery-photo-title" hidden></h3>
+      <p id="gallery-photo-year" class="gallery-photo-year" hidden></p>
+      <p id="gallery-photo-description" class="gallery-photo-description" hidden></p>
     </div>
   </dialog>
   <dialog id="work-dialog" class="work-dialog" aria-label="Work details">
@@ -838,11 +860,39 @@
       const items=(Array.isArray(cmsData.gallery)?cmsData.gallery:[]).filter(x=>safeFile(x?.image));
       const empty=gallery.querySelector('.empty-note');if(empty)empty.hidden=items.length>0;
       if(items.length){const grid=el('div','cms-gallery');
-        for(const item of items){const fig=document.createElement('figure'),img=document.createElement('img');img.src=item.image;img.alt=choose(item,'caption')||name;img.loading='lazy';fig.append(img);if(choose(item,'caption'))fig.append(el('figcaption','',choose(item,'caption')));grid.append(fig)}
+        for(const item of items){
+          const fig=document.createElement('figure'),button=document.createElement('button'),img=document.createElement('img');
+          const title=choose(item,'title')||choose(item,'caption');
+          button.type='button';button.className='gallery-photo-button';
+          button.setAttribute('aria-label',(language==='en'?'View photo: ':language==='ko'?'사진 보기: ':'檢視照片：')+(title||name));
+          img.src=item.image;img.alt=title||name;img.loading='lazy';
+          button.append(img);button.addEventListener('click',()=>showGalleryPhoto(item));
+          fig.append(button);
+          if(title)fig.append(el('figcaption','',title));
+          grid.append(fig);
+        }
         gallery.append(grid);
       }
     }
   }
+  const galleryDialog=document.getElementById('gallery-photo-dialog');
+  function showGalleryPhoto(item){
+    if(!galleryDialog||!safeFile(item?.image))return;
+    const img=document.getElementById('gallery-photo-large');
+    const title=choose(item,'title')||choose(item,'caption');
+    const year=item.year?String(item.year):'';
+    const description=choose(item,'description')||(!choose(item,'title')?'':choose(item,'caption'));
+    img.src=item.image;img.alt=title||'CHEN. Photography';
+    for(const [id,value] of [['gallery-photo-title',title],['gallery-photo-year',year],['gallery-photo-description',description]]){
+      const node=document.getElementById(id);
+      node.textContent=value;node.hidden=!value;
+    }
+    galleryDialog.querySelector('.gallery-photo-info').hidden=!(title||year||description);
+    if(!galleryDialog.open)galleryDialog.showModal();
+  }
+  galleryDialog?.querySelector('.gallery-photo-close')?.addEventListener('click',()=>galleryDialog.close());
+  galleryDialog?.addEventListener('click',event=>{if(event.target===galleryDialog)galleryDialog.close()});
+  galleryDialog?.addEventListener('close',()=>document.getElementById('gallery-photo-large')?.removeAttribute('src'));
   function showCMSWork(w){
     const dialog=document.getElementById('work-dialog'),detail=document.getElementById('work-dialog-body');
     if(!dialog||!detail)return;
