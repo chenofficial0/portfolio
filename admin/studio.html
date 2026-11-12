@@ -187,9 +187,34 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     input.type="file";input.accept="image/jpeg,image/png,image/webp";input.hidden=true;
     input.setAttribute("aria-label",label+"，選擇照片");
     const pick=btn("選擇照片",()=>input.click());
-    const upload=btn("上傳至 GitHub",()=>{},"btn dark");
-    // Upload is intentionally disabled while image publishing APIs remain under review.
-    upload.disabled=true;upload.title="安全上傳功能尚未啟用";
+    const upload=btn("上傳照片",async()=>{
+      const entry=localPhotos.get(obj)?.get(key);
+      if(!entry||!apiSession?.canUpload)return;
+      if(!confirm("確定上傳照片？照片將寫入公開 GitHub 儲存庫的測試分支，但不會立刻顯示於正式網站。請確認擁有公開使用權。"))return;
+      upload.disabled=true;status.textContent="正在將照片儲存至 GitHub 測試分支…";
+      try{
+        const base64=await new Promise((resolve,reject)=>{
+          const reader=new FileReader();
+          reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");
+          reader.onerror=()=>reject(Error("照片讀取失敗"));
+          reader.readAsDataURL(entry.blob);
+        });
+        const scope=current==="about"?"hero":current==="profile"?"profile":current==="gallery"?"gallery":key==="cover"?"work-cover":"work-still";
+        const response=await fetch("/api/media/image",{
+          method:"POST",credentials:"same-origin",
+          headers:{"content-type":"application/json","x-chen-csrf":apiSession.csrf},
+          body:JSON.stringify({scope,mime:"image/jpeg",base64})
+        });
+        const result=await response.json();
+        if(!response.ok)throw Error(result.error||"圖片上傳失敗");
+        obj[key]=result.url;pathInput.value=result.url;entry.uploaded=true;
+        markDirty();showPhoto();
+        status.textContent="已儲存至 GitHub 測試分支，尚未更新正式網站。請在發布功能啟用後，確認內容再發布。";
+      }catch(err){status.textContent="上傳失敗："+err.message}
+      finally{upload.disabled=!apiSession?.canUpload||!localPhotos.get(obj)?.get(key)}
+    },"btn dark");
+    upload.disabled=true;
+    upload.title=apiSession?.canUpload?"上傳至 GitHub 測試分支":"安全上傳功能尚未啟用";
     const status=el("div","upload-status","目前僅支援本機預覽，尚未上傳 GitHub；請勿將預覽當作已儲存。");
     const pathInput=document.createElement("input");
     pathInput.type="text";pathInput.value=obj[key]||"";
@@ -198,7 +223,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     const hint=el("small","","JPG / PNG / WebP，原檔上限 10 MB。選取後自動產生壓縮預覽，不會直接修改網站。");
     function showPhoto(){
       const local=localPhotos.get(obj)?.get(key);
-      if(local){preview.src=local.url;preview.hidden=false;status.textContent="本機照片已選擇並壓縮（"+(local.blob.size/1024).toFixed(0)+" KB）。尚未上傳；切換編輯區域仍可預覽，重新整理後會消失。"}
+      if(local){preview.src=local.url;preview.hidden=false;status.textContent=local.uploaded?"已上傳測試分支，尚待正式發布。":"本機照片已選擇並壓縮（"+(local.blob.size/1024).toFixed(0)+" KB）。尚未上傳；切換編輯區域仍可預覽，重新整理後會消失。"}
       else if(obj[key]){preview.src=obj[key];preview.hidden=false;status.textContent="目前顯示已設定的圖片網址／路徑。"}
       else{preview.removeAttribute("src");preview.hidden=true;status.textContent="尚未選取照片。本機預覽不會自動儲存或發布。"}
     }
@@ -209,6 +234,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
         status.textContent="正在處理照片…";
         const blob=await compressPhoto(file);
         cachePhoto(obj,key,blob);
+        upload.disabled=!apiSession?.canUpload;
         showPhoto();
       }catch(err){status.textContent="無法讀取照片："+err.message}
       finally{input.value=""}
