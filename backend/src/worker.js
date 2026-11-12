@@ -201,6 +201,21 @@ async function uploadImage(request,session,env){
   }catch(err){return fail("Unable to stage image to GitHub",err.http===403?403:502)}
 }
 
+
+const STAGED_IMAGE_PATH=/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg$/;
+async function previewStagedImage(request,session){
+  const relative=new URL(request.url).searchParams.get("path")||"";
+  if(!STAGED_IMAGE_PATH.test(relative))return fail("Invalid staged image path",400);
+  try{
+    const result=await github("/repos/"+REPO+"/contents/"+relative+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
+    if(result.type!=="file"||result.encoding!=="base64"||!result.content||result.size>1572864)return fail("Image unavailable",404);
+    const decoded=atob(result.content.replace(/\s/g,""));
+    const bytes=Uint8Array.from(decoded,c=>c.charCodeAt(0));
+    if(bytes[0]!==0xff||bytes[1]!==0xd8||bytes[bytes.length-2]!==0xff||bytes[bytes.length-1]!==0xd9)return fail("Image format invalid",422);
+    return new Response(bytes,{headers:{"content-type":"image/jpeg","cache-control":"private, no-store","x-content-type-options":"nosniff"}});
+  }catch(_){return fail("Image unavailable",404)}
+}
+
 async function studio(env){
   const upstream=await fetch(PUBLIC_STUDIO,{headers:{"Cache-Control":"no-cache"}});
   if(!upstream.ok)return fail("Studio page has not deployed yet",503);
@@ -234,6 +249,7 @@ export default {
       if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:false,canSave:env.ENABLE_DRAFT_SAVES==="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true"}:{authenticated:false,canPublish:false,canSave:false,canUpload:false});
       if(!s)return fail("Sign in with approved GitHub account",401);
       if(method==="GET"&&path==="/api/content")return getContent(s);
+      if(method==="GET"&&path==="/api/media/preview")return previewStagedImage(request,s);
       if(method==="POST"&&path==="/api/media/image"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return uploadImage(request,s,env);
