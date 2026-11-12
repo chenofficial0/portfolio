@@ -59,7 +59,7 @@
       "year": 2026,
       "category": "Film",
       "stills": [],
-      "visible": false,
+      "visible": true,
       "title_en": "test",
       "title_ko": "어..",
       "role_zh": "路人",
