@@ -236,8 +236,8 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
         const session=await response.json();
         if(session.authenticated){
           apiSession=session;
-          publish.hidden=false;logout.hidden=false;
-          notice.textContent="已透過 GitHub 登入："+session.login+"。可在確認內容後發布到正式網站。請注意：content/site.json 是公開資料。";
+          publish.hidden=!session.canPublish;logout.hidden=false;
+          notice.textContent="已透過 GitHub 登入："+session.login+"。"+(session.canPublish?"發布功能已由伺服器啟用，發布前請確認資料可公開。":"目前為安全測試模式：正式發布功能仍停用。可編輯及匯出 JSON 備份。");
           const contentResponse=await fetch("/api/content",{credentials:"same-origin",cache:"no-store"});
           if(!contentResponse.ok)throw Error("無法讀取網站的最新資料");
           const payload=await contentResponse.json();data=norm(payload.data);contentSha=payload.sha;
