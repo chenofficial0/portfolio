@@ -174,7 +174,7 @@ async function studio(env){
   return new Response(secured,{headers:{
     "content-type":"text/html; charset=utf-8","cache-control":"no-store",
     "x-frame-options":"DENY","x-content-type-options":"nosniff",
-    "content-security-policy":"default-src 'none'; script-src 'nonce-"+nonce+"'; style-src 'nonce-"+nonce+"'; style-src-attr 'unsafe-inline'; connect-src 'self' https://chenofficial0.github.io; img-src 'self' data: https:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+    "content-security-policy":"default-src 'none'; script-src 'nonce-"+nonce+"'; style-src 'nonce-"+nonce+"'; style-src-attr 'unsafe-inline'; connect-src 'self' https://chenofficial0.github.io https://raw.githubusercontent.com; img-src 'self' data: https:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
   }});
 }
 export default {
