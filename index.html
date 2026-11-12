@@ -139,6 +139,9 @@
 .model-card-image-dialog::backdrop{background:#0009}
 .model-card-image-dialog img{width:100%;height:auto;display:block;user-select:auto;-webkit-touch-callout:default}
 .model-card-image-hint{font-size:11px;color:#777;margin:14px 25px 16px 0}
+.model-card-export-status{font-size:12px;color:#555;line-height:1.7;margin:0 0 13px;white-space:pre-wrap}
+.model-card-image-dialog #model-card-image:not([src]){display:none}
+.model-card-save-actions[hidden]{display:none!important}
 .model-card-save-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:16px}
 .model-card-save-actions .comp-card-button{display:inline-flex;justify-content:center;align-items:center}
 .model-card-save-actions [hidden]{display:none!important}
@@ -283,8 +286,9 @@
   <dialog id="model-card-image-dialog" class="model-card-image-dialog" aria-label="可儲存的演員資料卡圖片">
     <button class="dialog-close" type="button" data-model-card-close aria-label="關閉">×</button>
     <p class="model-card-image-hint">手機長按圖片，或電腦按右鍵選擇儲存圖片。</p>
+    <p id="model-card-export-status" class="model-card-export-status" role="status" aria-live="polite" hidden></p>
     <img id="model-card-image" alt="演員資料卡，可長按或按右鍵儲存">
-    <div class="model-card-save-actions">
+    <div class="model-card-save-actions" hidden>
       <a id="model-card-image-download" class="comp-card-button" href="#" download="CHEN-actor-card.png">下載 PNG 圖片</a>
       <button type="button" id="model-card-share-button" class="comp-card-button" hidden>分享／儲存至照片</button>
       <a id="model-card-image-open" class="comp-card-button" href="#" target="_blank" rel="noopener noreferrer">另開圖片</a>
@@ -428,6 +432,13 @@
   // Pinned html2canvas release; the integrity attribute prevents unexpected CDN changes.
   const captureNonce=document.currentScript?.nonce||"";
   let captureLibraryPromise=null;
+  const withExportTimeout=(promise,ms,label)=>Promise.race([
+    promise,new Promise((_,reject)=>setTimeout(()=>reject(Error(label+"逾時，請重試")),ms))
+  ]);
+  function showExportStatus(text,isError=false){
+    const node=document.getElementById("model-card-export-status");
+    if(node){node.hidden=false;node.textContent=text;node.style.color=isError?"#a33":"#555"}
+  }
   function ensureCaptureLibrary(){
     if(typeof window.html2canvas==="function")return Promise.resolve(window.html2canvas);
     if(captureLibraryPromise)return captureLibraryPromise;
@@ -461,12 +472,17 @@
     const card=document.querySelector('.comp-card'),dialog=document.getElementById('model-card-image-dialog');
     const output=document.getElementById('model-card-image'),download=document.getElementById('model-card-image-download');
     const button=document.getElementById('model-card-image-button');
+    const actions=dialog?.querySelector('.model-card-save-actions');
     if(!card||!dialog||!output||!download)return;
     if(button){button.disabled=true;button.setAttribute("aria-busy","true")}
+    if(!dialog.open)dialog.showModal();
+    output.removeAttribute('src');
+    if(actions)actions.hidden=true;
+    showExportStatus('正在準備資料卡圖片…');
     try{
-      if(document.fonts?.ready)await document.fonts.ready;
+      if(document.fonts?.ready)await withExportTimeout(document.fonts.ready,4500,"字體載入");
       const photos=Array.from(card.querySelectorAll('img'));
-      await Promise.all(photos.map(img=>img.decode?.().catch(()=>{})||Promise.resolve()));
+      await withExportTimeout(Promise.all(photos.map(img=>img.decode?.().catch(()=>{})||Promise.resolve())),4500,'照片載入');
       if(photos.some(img=>!img.complete||!img.naturalWidth))throw Error("形象照片尚未載入完成，請稍後再試。");
       // Pre-render the portrait into a correctly proportioned image surface.
       // html2canvas may ignore CSS object-fit:contain and stretch portrait images.
@@ -487,8 +503,10 @@
         // Fail before the final export if the source image blocks canvas access.
         try{containedPortrait.toDataURL('image/png')}catch(_){throw Error('形象照片來源不允許匯出，請使用同網站已上傳的照片')}
       }
-      const html2canvas=await ensureCaptureLibrary();
-      const canvas=await html2canvas(card,{
+      showExportStatus("正在載入圖片工具…");
+      const html2canvas=await withExportTimeout(ensureCaptureLibrary(),8000,"圖片工具");
+      showExportStatus("正在產生資料卡 PNG…");
+      const canvas=await withExportTimeout(html2canvas(card,{
         backgroundColor:'#f8f8f7',
         // Limit the bitmap size on phones (especially mobile Safari).
         scale:Math.min(2,Math.max(1,window.devicePixelRatio||1),Math.sqrt(4500000/Math.max(1,card.scrollWidth*card.scrollHeight))),
@@ -517,11 +535,11 @@
             }
           }
         }
-      });
+      }),12000,"圖片渲染");
       if(!canvas.width||!canvas.height)throw Error("沒有可儲存的資料卡畫面");
-      const blob=await new Promise((resolve,reject)=>{
+      const blob=await withExportTimeout(new Promise((resolve,reject)=>{
         canvas.toBlob(value=>value?resolve(value):reject(Error("PNG 圖片建立失敗")),'image/png');
-      });
+      }),8000,"PNG 輸出");
       releaseCardExport();
       exportedCardBlob=blob;
       exportedCardUrl=URL.createObjectURL(blob);
@@ -532,7 +550,10 @@
       if(open)open.href=exportedCardUrl;
       const share=document.getElementById('model-card-share-button');
       if(share)share.hidden=!supportsCardShare(blob);
-      if(!dialog.open)dialog.showModal();
+      if(actions)actions.hidden=false;
+      showExportStatus("圖片已準備完成。iPhone 可下載、分享，或長按儲存圖片。");
+    }catch(error){
+      showExportStatus("無法產生圖片："+(error?.message||"未知錯誤"),true);
     }finally{
       if(button){button.disabled=false;button.removeAttribute("aria-busy")}
     }
