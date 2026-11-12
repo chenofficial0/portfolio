@@ -101,20 +101,20 @@
 .comp-card-button{display:inline-flex;align-items:center;gap:0}
 .comp-card-button .link-arrow{margin-left:8px}
 
-/* CHEN. responsive portraits — preserve proportions and avoid cropping */
-.hero-images{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:16px;width:min(100%,660px)}
-.hero-images .hero-visual{width:100%;max-width:none;max-height:none;aspect-ratio:4/5;background:transparent;overflow:hidden}
-.hero-images .hero-visual img{width:100%;height:100%;object-fit:contain;object-position:center;transform:none}
-/* White page shows through around photos of any aspect ratio; placeholders have no tinted card. */
+/* CHEN. portraits: actual photo edges align with the text; consistent edge-to-edge gap. */
+.hero-images{display:flex;align-items:flex-start;justify-content:flex-start;gap:20px;width:min(100%,660px)}
+.hero-images .hero-visual{flex:0 0 auto;width:260px;max-width:100%;height:325px;max-height:none;aspect-ratio:auto;background:transparent;overflow:hidden;align-items:center;justify-content:center}
+.hero-images .hero-visual img{display:block;width:100%;height:100%;object-fit:contain;object-position:left top;transform:none}
 .hero-images .hero-visual.hero-empty,.hero-images .hero-visual.has-photo{background:transparent}
+.hero-images .hero-secondary:not(.has-photo){display:none}
 .comp-card-photo.has-photo,.work-thumb:has(img),.cms-gallery img,.gallery-grid img,.detail-img,.detail-gallery img{background:transparent}
 .hero-copy{width:min(100%,660px)}
 .comp-card-photo img,.work-thumb img,.gallery-grid img,.cms-gallery img,.detail-img,.detail-gallery img{object-fit:contain}
 .work-open:hover .work-thumb img{transform:none}
 @media(max-width:700px){
-  .hero-images{display:block;width:100%}
+  .hero-images{width:100%;gap:0}
   .hero-images .hero-secondary{display:none!important}
-  .hero-images .hero-visual{width:100%;aspect-ratio:4/5}
+  .hero-images .hero-visual{max-width:100%;aspect-ratio:auto}
 }
 </style>
   
@@ -342,12 +342,37 @@
   // Admin-managed content lives in content/site.json, not in this HTML file.
   const safeFile = (url) => typeof url === 'string' && url.trim() && isSafeUrl(url);
   const setText = (selector,text) => {const node=document.querySelector(selector);if(node && text!=null)node.textContent=String(text)};
+  // Use each image's intrinsic ratio so the visible edges (not empty grid cells)
+  // are precisely aligned and their gap remains stable for different photo ratios.
+  function resizeHeroPortraits(){
+    const holder=document.querySelector('.hero-images');
+    if(!holder)return;
+    const mobile=window.matchMedia('(max-width:700px)').matches;
+    const boxes=Array.from(holder.querySelectorAll('.hero-visual')).filter(box=>!(box.classList.contains('hero-secondary')&&(mobile||!box.classList.contains('has-photo'))));
+    if(!boxes.length)return;
+    const gap=mobile?0:20;
+    const width=holder.clientWidth;
+    if(!width)return;
+    const ratios=boxes.map(box=>{
+      const img=box.querySelector('img');
+      const ratio=img&&img.naturalWidth&&img.naturalHeight?img.naturalWidth/img.naturalHeight:4/5;
+      return Math.max(0.2,Math.min(5,ratio));
+    });
+    const total=ratios.reduce((sum,ratio)=>sum+ratio,0);
+    const height=Math.max(1,Math.min(mobile?480:400,(width-gap*(boxes.length-1))/total));
+    boxes.forEach((box,index)=>{
+      box.style.width=(height*ratios[index]).toFixed(2)+'px';
+      box.style.height=height.toFixed(2)+'px';
+    });
+  }
+  window.addEventListener('resize',resizeHeroPortraits);
   const mediaImage = (selector,url,alt) => {
     const box=document.querySelector(selector);if(!box)return;
     const old=box.querySelector('img');if(old)old.remove();
     box.classList.toggle('has-photo',Boolean(safeFile(url)));
     const placeholder=box.querySelector('[data-i18n]');if(placeholder)placeholder.hidden=Boolean(safeFile(url));
-    if(safeFile(url)){const img=document.createElement('img');img.src=url;img.alt=alt;img.loading=selector.includes('hero')?'eager':'lazy';box.prepend(img)}
+    if(safeFile(url)){const img=document.createElement('img');img.src=url;img.alt=alt;img.loading=selector.includes('hero')?'eager':'lazy';if(box.closest('.hero-images'))img.addEventListener('load',resizeHeroPortraits);box.prepend(img)}
+    if(box.closest('.hero-images'))resizeHeroPortraits();
   };
   function renderCMS(){
     if(!cmsData)return;
