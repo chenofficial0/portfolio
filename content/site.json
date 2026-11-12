@@ -4,7 +4,7 @@
     "name_zh": "姜翊",
     "bio_zh": "我是一名來自台灣的演員，喜歡透過觀察日常生活中的細節，探索角色的情緒與故事。\n\n我相信表演不只是在呈現台詞，更是理解人物、真誠傳達感受的過程。期待在不同類型的作品中持續學習，與更多創作者合作。",
     "based_in": "TAIWAN",
-    "hero_image": "",
+    "hero_image": "https://chenofficial0.github.io/portfolio/assets/uploads/chen-hero-2026-11-12-8tp6PGMB_zcRxazp.jpg",
     "name_ko": "강익",
     "languages": [
       "中文",
@@ -40,11 +40,11 @@
     "agency_en": "None",
     "agency_ko": "없음"
   },
+  "works": [],
+  "gallery": [],
   "contact": {
     "email": "clyichen0312@gmail.com",
     "instagram": "https://www.instagram.com/c.yichen___?rpxt=YnBqcmR1MTJqeTRr&utm_source=qr",
     "other_url": ""
-  },
-  "works": [],
-  "gallery": []
+  }
 }
