@@ -218,17 +218,54 @@ async function uploadImage(request,session,env){
 }
 
 
+const RESOURCE_REF=/^assets\/uploads\/chen-resource-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.(?:pdf|jpg|png)$/;
+const RESOURCE_MAX_BYTES=4194304;
+function mediaMime(path){return path.endsWith(".pdf")?"application/pdf":path.endsWith(".png")?"image/png":"image/jpeg"}
+function validMediaBytes(path,bytes){
+  if(!bytes||bytes.length<100||bytes.length>(RESOURCE_REF.test(path)?RESOURCE_MAX_BYTES:1572864))return false;
+  if(path.endsWith(".jpg"))return bytes[0]===255&&bytes[1]===216&&bytes[bytes.length-2]===255&&bytes[bytes.length-1]===217;
+  if(path.endsWith(".png")){
+    const h=[137,80,78,71,13,10,26,10],e=[73,69,78,68,174,66,96,130];
+    return h.every((n,i)=>bytes[i]===n)&&e.every((n,i)=>bytes[bytes.length-8+i]===n);
+  }
+  if(path.endsWith(".pdf")){
+    const head=String.fromCharCode(...bytes.slice(0,5));
+    const tail=new TextDecoder("latin1").decode(bytes.slice(-1024));
+    return head==="%PDF-"&&tail.includes("%%EOF");
+  }
+  return false;
+}
+async function uploadResource(request,session,env){
+  if(env.ENABLE_MEDIA_UPLOADS!=="true")return fail("File uploads disabled",403);
+  if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
+  if(Number(request.headers.get("content-length")||0)>5700000)return fail("Upload too large",413);
+  const raw=await request.text();if(raw.length>5700000)return fail("Upload too large",413);
+  let data;try{data=JSON.parse(raw)}catch(_){return fail("Invalid file request",400)}
+  if(!data||!["application/pdf","image/jpeg","image/png"].includes(data.mime)||typeof data.base64!=="string"||data.base64.length>5592408||!/^[A-Za-z0-9+/]+={0,2}$/.test(data.base64))return fail("Only PDF, JPG and PNG files are supported",422);
+  let bytes;
+  try{bytes=Uint8Array.from(atob(data.base64),c=>c.charCodeAt(0))}catch(_){return fail("Invalid file encoding",422)}
+  const ext={"application/pdf":"pdf","image/jpeg":"jpg","image/png":"png"}[data.mime];
+  const path="assets/uploads/chen-resource-"+new Date().toISOString().slice(0,10)+"-"+random().slice(0,16)+"."+ext;
+  if(!validMediaBytes(path,bytes))return fail("File signature invalid or file exceeds 4 MB",422);
+  try{
+    const result=await github("/repos/"+REPO+"/contents/"+path,session.token,{
+      method:"PUT",headers:{"content-type":"application/json"},
+      body:JSON.stringify({message:"Stage CHEN. actor resource for review",content:data.base64,branch:CONTENT_BRANCH})
+    });
+    return json({ok:true,path,url:IMAGE_URL_PREFIX+path,staging:true,commit:result.commit?.sha||null,mime:data.mime});
+  }catch(e){return fail("Could not upload actor resource",e.http===403?403:502)}
+}
 const STAGED_IMAGE_PATH=/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg$/;
 async function previewStagedImage(request,session){
   const relative=new URL(request.url).searchParams.get("path")||"";
-  if(!STAGED_IMAGE_PATH.test(relative))return fail("Invalid staged image path",400);
+  if(!STAGED_IMAGE_PATH.test(relative)&&!RESOURCE_REF.test(relative))return fail("Invalid staged media path",400);
   try{
     const result=await github("/repos/"+REPO+"/contents/"+relative+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
-    if(result.type!=="file"||result.encoding!=="base64"||!result.content||result.size>1572864)return fail("Image unavailable",404);
+    if(result.type!=="file"||result.encoding!=="base64"||!result.content||result.size>(RESOURCE_REF.test(relative)?RESOURCE_MAX_BYTES:1572864))return fail("Media unavailable",404);
     const decoded=atob(result.content.replace(/\s/g,""));
     const bytes=Uint8Array.from(decoded,c=>c.charCodeAt(0));
-    if(bytes[0]!==0xff||bytes[1]!==0xd8||bytes[bytes.length-2]!==0xff||bytes[bytes.length-1]!==0xd9)return fail("Image format invalid",422);
-    return new Response(bytes,{headers:{"content-type":"image/jpeg","cache-control":"private, no-store","x-content-type-options":"nosniff"}});
+    if(!validMediaBytes(relative,bytes))return fail("Media format invalid",422);
+    return new Response(bytes,{headers:{"content-type":mediaMime(relative),"cache-control":"private, no-store","x-content-type-options":"nosniff","content-disposition":"inline"}});
   }catch(_){return fail("Image unavailable",404)}
 }
 
@@ -239,10 +276,11 @@ const PREVIEW_HTML="https://chenofficial0.github.io/portfolio/";
 function stagedPath(value){
   if(typeof value!=="string"||!value.startsWith(IMAGE_URL_PREFIX))return null;
   const path=value.slice(IMAGE_URL_PREFIX.length);
-  return IMAGE_REF.test(path)?path:null;
+  return IMAGE_REF.test(path)||RESOURCE_REF.test(path)?path:null;
 }
 function imageRefs(d){
-  const images=[d.about?.hero_image,d.about?.hero_image_secondary,d.profile?.photo];
+  const images=[d.about?.hero_image,d.about?.hero_image_secondary,d.profile?.photo,d.profile?.model_card_pdf,d.profile?.resume_pdf];
+  for(const link of d.profile?.links||[])images.push(link.url);
   for(const w of d.works||[]){
     images.push(w.cover);
     for(const st of w.stills||[])images.push(st.image);
@@ -271,6 +309,9 @@ async function previewContent(session){
   data.about.hero_image=rewrite(data.about.hero_image);
   data.about.hero_image_secondary=rewrite(data.about.hero_image_secondary);
   data.profile.photo=rewrite(data.profile.photo);
+  data.profile.model_card_pdf=rewrite(data.profile.model_card_pdf);
+  data.profile.resume_pdf=rewrite(data.profile.resume_pdf);
+  for(const link of data.profile.links||[])link.url=rewrite(link.url);
   for(const w of data.works){
     w.cover=rewrite(w.cover);
     for(const st of w.stills||[])st.image=rewrite(st.image);
@@ -308,11 +349,9 @@ async function preparePublish(session,env){
   for(const path of staged){
     try{
       const asset=await github("/repos/"+REPO+"/contents/"+path+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
-      if(asset.type!=="file"||asset.size>1572864||!asset.sha||asset.encoding!=="base64"||!asset.content)return fail("Invalid staged photo: "+path,422);
-      // Reject non-JPEG content renamed as .jpg.
-      const bytes=atob(asset.content.replace(/\s/g,""));
-      if(bytes.length<100||bytes.charCodeAt(0)!==255||bytes.charCodeAt(1)!==216||
-         bytes.charCodeAt(bytes.length-2)!==255||bytes.charCodeAt(bytes.length-1)!==217)return fail("Invalid JPEG file: "+path,422);
+      if(asset.type!=="file"||!asset.sha||asset.encoding!=="base64"||!asset.content||asset.size>(RESOURCE_REF.test(path)?RESOURCE_MAX_BYTES:1572864))return fail("Invalid staged media: "+path,422);
+      const bytes=Uint8Array.from(atob(asset.content.replace(/\s/g,"")),c=>c.charCodeAt(0));
+      if(!validMediaBytes(path,bytes))return fail("Invalid staged media signature: "+path,422);
     }catch(_){return fail("Missing uploaded photo on staging branch",422)}
   }
   const differences=["about","profile","works","gallery","contact"].filter(k=>JSON.stringify(draft.data[k])!==JSON.stringify(live.data[k]));
@@ -349,10 +388,9 @@ async function confirmPublish(request,session,env){
   const changes=[{path:CONTENT_PATH,mode:"100644",type:"blob",sha:draft.sha}];
   for(const path of refs){
     const asset=await github("/repos/"+REPO+"/contents/"+path+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
-    if(asset.type!=="file"||!asset.sha||asset.size>1572864||asset.encoding!=="base64"||!asset.content)return fail("Staged photo is missing or invalid",422);
-    const bytes=atob(asset.content.replace(/\s/g,""));
-    if(bytes.length<100||bytes.charCodeAt(0)!==255||bytes.charCodeAt(1)!==216||
-       bytes.charCodeAt(bytes.length-2)!==255||bytes.charCodeAt(bytes.length-1)!==217)return fail("Staged image is not a valid JPEG",422);
+    if(asset.type!=="file"||!asset.sha||asset.encoding!=="base64"||!asset.content||asset.size>(RESOURCE_REF.test(path)?RESOURCE_MAX_BYTES:1572864))return fail("Staged media is missing or invalid",422);
+    const bytes=Uint8Array.from(atob(asset.content.replace(/\s/g,"")),c=>c.charCodeAt(0));
+    if(!validMediaBytes(path,bytes))return fail("Staged media has invalid file signature",422);
     changes.push({path,mode:"100644",type:"blob",sha:asset.sha});
   }
   const tree=await github("/repos/"+REPO+"/git/trees",session.token,{
@@ -413,6 +451,10 @@ export default {
         return confirmPublish(request,s,env);
       }
       if(method==="GET"&&path==="/api/media/preview")return previewStagedImage(request,s);
+      if(method==="POST"&&path==="/api/media/resource"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return uploadResource(request,s,env);
+      }
       if(method==="POST"&&path==="/api/media/image"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return uploadImage(request,s,env);
