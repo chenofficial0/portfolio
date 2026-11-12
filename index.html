@@ -452,6 +452,25 @@
       const photos=Array.from(card.querySelectorAll('img'));
       await Promise.all(photos.map(img=>img.decode?.().catch(()=>{})||Promise.resolve()));
       if(photos.some(img=>!img.complete||!img.naturalWidth))throw Error("形象照片尚未載入完成，請稍後再試。");
+      // Pre-render the portrait into a correctly proportioned image surface.
+      // html2canvas may ignore CSS object-fit:contain and stretch portrait images.
+      let containedPortrait=null;
+      const photo=card.querySelector('.comp-card-photo img');
+      if(photo&&photo.naturalWidth&&photo.naturalHeight){
+        const holder=card.querySelector('.comp-card-photo');
+        const bounds=holder.getBoundingClientRect();
+        const width=Math.max(1,Math.round(bounds.width*2));
+        const height=Math.max(1,Math.round(bounds.height*2));
+        containedPortrait=document.createElement('canvas');
+        containedPortrait.width=width;containedPortrait.height=height;
+        const photoCtx=containedPortrait.getContext('2d');
+        if(!photoCtx)throw Error('瀏覽器無法繪製形象照片');
+        const scale=Math.min(width/photo.naturalWidth,height/photo.naturalHeight);
+        const drawWidth=photo.naturalWidth*scale,drawHeight=photo.naturalHeight*scale;
+        photoCtx.drawImage(photo,(width-drawWidth)/2,(height-drawHeight)/2,drawWidth,drawHeight);
+        // Fail before the final export if the source image blocks canvas access.
+        try{containedPortrait.toDataURL('image/png')}catch(_){throw Error('形象照片來源不允許匯出，請使用同網站已上傳的照片')}
+      }
       const html2canvas=await ensureCaptureLibrary();
       const canvas=await html2canvas(card,{
         backgroundColor:'#f8f8f7',
@@ -465,6 +484,21 @@
           const clonedCard=doc.querySelector('.comp-card');
           if(!clonedCard)return;
           for(const hidden of clonedCard.querySelectorAll('.comp-card-actions,.comp-card-export'))hidden.remove();
+          if(containedPortrait){
+            const clonedWrap=clonedCard.querySelector('.comp-card-photo');
+            const clonedPhoto=clonedWrap?.querySelector('img');
+            if(clonedWrap&&clonedPhoto){
+              const replacement=doc.createElement('canvas');
+              replacement.width=containedPortrait.width;
+              replacement.height=containedPortrait.height;
+              replacement.style.display='block';
+              replacement.style.width='100%';
+              replacement.style.height='100%';
+              replacement.style.flex='0 0 100%';
+              replacement.getContext('2d').drawImage(containedPortrait,0,0);
+              clonedPhoto.replaceWith(replacement);
+            }
+          }
         }
       });
       if(!canvas.width||!canvas.height)throw Error("沒有可儲存的資料卡畫面");
