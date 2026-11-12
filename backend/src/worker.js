@@ -96,6 +96,12 @@ function validate(d){
     if(w.stills!==undefined&&(!Array.isArray(w.stills)||w.stills.length>40||w.stills.some(x=>!x||typeof x!=="object"||!validURL(x.image)||!safeString(x.caption||"",500))))return false;
   }
   if(d.about.languages!==undefined&&(!Array.isArray(d.about.languages)||d.about.languages.length>12||d.about.languages.some(x=>!safeString(x,90))))return false;
+  if(d.about.hero_images!==undefined){
+    if(!Array.isArray(d.about.hero_images)||d.about.hero_images.length>30)return false;
+    for(const item of d.about.hero_images){
+      if(!item||typeof item!=="object"||Array.isArray(item)||!safeString(item.image,2048)||!validURL(item.image))return false;
+    }
+  }
   for(const field of ["model_card_pdf_kind","resume_pdf_kind","showreel_url_kind"]){
     if(d.profile[field]!==undefined&&!["url","pdf","jpg","png",""].includes(d.profile[field]))return false;
   }
@@ -293,6 +299,7 @@ function stagedPath(value){
 }
 function imageRefs(d){
   const images=[d.about?.hero_image,d.about?.hero_image_secondary,d.profile?.photo,d.profile?.model_card_pdf,d.profile?.resume_pdf,d.profile?.showreel_url];
+  for(const item of d.about?.hero_images||[])images.push(item.image);
   for(const link of d.profile?.links||[])images.push(link.url);
   for(const w of d.works||[]){
     images.push(w.cover);
@@ -321,6 +328,7 @@ async function previewContent(session){
   };
   data.about.hero_image=rewrite(data.about.hero_image);
   data.about.hero_image_secondary=rewrite(data.about.hero_image_secondary);
+  for(const item of data.about.hero_images||[])item.image=rewrite(item.image);
   data.profile.photo=rewrite(data.profile.photo);
   data.profile.model_card_pdf=rewrite(data.profile.model_card_pdf);
   data.profile.resume_pdf=rewrite(data.profile.resume_pdf);
