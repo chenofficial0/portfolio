@@ -103,8 +103,11 @@
 
 /* CHEN. responsive portraits — preserve proportions and avoid cropping */
 .hero-images{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:16px;width:min(100%,660px)}
-.hero-images .hero-visual{width:100%;max-width:none;max-height:none;aspect-ratio:4/5;background:var(--soft);overflow:hidden}
+.hero-images .hero-visual{width:100%;max-width:none;max-height:none;aspect-ratio:4/5;background:transparent;overflow:hidden}
 .hero-images .hero-visual img{width:100%;height:100%;object-fit:contain;object-position:center;transform:none}
+/* White page shows through around photos of any aspect ratio; placeholders have no tinted card. */
+.hero-images .hero-visual.hero-empty,.hero-images .hero-visual.has-photo{background:transparent}
+.comp-card-photo.has-photo,.work-thumb:has(img),.cms-gallery img,.gallery-grid img,.detail-img,.detail-gallery img{background:transparent}
 .hero-copy{width:min(100%,660px)}
 .comp-card-photo img,.work-thumb img,.gallery-grid img,.cms-gallery img,.detail-img,.detail-gallery img{object-fit:contain}
 .work-open:hover .work-thumb img{transform:none}
