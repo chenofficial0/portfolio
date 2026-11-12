@@ -53,7 +53,21 @@
     "agency_ko": "없음",
     "links": []
   },
-  "works": [],
+  "works": [
+    {
+      "title_zh": "測試",
+      "year": 2026,
+      "category": "Film",
+      "stills": [],
+      "visible": false,
+      "title_en": "test",
+      "title_ko": "어..",
+      "role_zh": "路人",
+      "role_en": "www",
+      "role_ko": "ㅋㅋㅋ",
+      "cover": "https://chenofficial0.github.io/portfolio/assets/uploads/chen-work-cover-2026-11-12-ktECV3daib3_SiTo.jpg"
+    }
+  ],
   "gallery": [],
   "contact": {
     "email": "clyichen0312@gmail.com",
