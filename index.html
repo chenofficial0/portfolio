@@ -139,7 +139,9 @@
 .model-card-image-dialog::backdrop{background:#0009}
 .model-card-image-dialog img{width:100%;height:auto;display:block;user-select:auto;-webkit-touch-callout:default}
 .model-card-image-hint{font-size:11px;color:#777;margin:14px 25px 16px 0}
-.model-card-image-dialog #model-card-image-download{margin-top:16px}
+.model-card-save-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:16px}
+.model-card-save-actions .comp-card-button{display:inline-flex;justify-content:center;align-items:center}
+.model-card-save-actions [hidden]{display:none!important}
 /* Profile card: hide stale photo placeholder and keep translated save control fixed. */
 .comp-card-photo.has-photo [data-i18n="profilePhotoPending"]{display:none!important}
 .comp-card-export{min-width:132px;justify-content:center;text-align:center;white-space:nowrap}
@@ -282,7 +284,11 @@
     <button class="dialog-close" type="button" data-model-card-close aria-label="關閉">×</button>
     <p class="model-card-image-hint">手機長按圖片，或電腦按右鍵選擇儲存圖片。</p>
     <img id="model-card-image" alt="演員資料卡，可長按或按右鍵儲存">
-    <a id="model-card-image-download" class="comp-card-button" href="#" download="CHEN-actor-card.png">下載 PNG 圖片</a>
+    <div class="model-card-save-actions">
+      <a id="model-card-image-download" class="comp-card-button" href="#" download="CHEN-actor-card.png">下載 PNG 圖片</a>
+      <button type="button" id="model-card-share-button" class="comp-card-button" hidden>分享／儲存至照片</button>
+      <a id="model-card-image-open" class="comp-card-button" href="#" target="_blank" rel="noopener noreferrer">另開圖片</a>
+    </div>
   </dialog>
   <dialog id="work-dialog" class="work-dialog" aria-label="Work details">
     <button class="dialog-close" type="button" data-close aria-label="Close">×</button>
@@ -441,6 +447,16 @@
     }).catch(error=>{captureLibraryPromise=null;throw error});
     return captureLibraryPromise;
   }
+  let exportedCardUrl=null,exportedCardBlob=null;
+  function releaseCardExport(){
+    if(exportedCardUrl)URL.revokeObjectURL(exportedCardUrl);
+    exportedCardUrl=null;exportedCardBlob=null;
+  }
+  function supportsCardShare(blob){
+    if(!navigator.share||!navigator.canShare||!blob)return false;
+    try{return navigator.canShare({files:[new File([blob],'CHEN-actor-card.png',{type:'image/png'})]})}
+    catch(_){return false}
+  }
   async function makeModelCardImage(){
     const card=document.querySelector('.comp-card'),dialog=document.getElementById('model-card-image-dialog');
     const output=document.getElementById('model-card-image'),download=document.getElementById('model-card-image-download');
@@ -474,7 +490,8 @@
       const html2canvas=await ensureCaptureLibrary();
       const canvas=await html2canvas(card,{
         backgroundColor:'#f8f8f7',
-        scale:Math.min(3,Math.max(2,window.devicePixelRatio||1)),
+        // Limit the bitmap size on phones (especially mobile Safari).
+        scale:Math.min(2,Math.max(1,window.devicePixelRatio||1),Math.sqrt(4500000/Math.max(1,card.scrollWidth*card.scrollHeight))),
         useCORS:true,
         allowTaint:false,
         logging:false,
@@ -502,8 +519,19 @@
         }
       });
       if(!canvas.width||!canvas.height)throw Error("沒有可儲存的資料卡畫面");
-      const png=canvas.toDataURL('image/png');
-      output.src=png;download.href=png;
+      const blob=await new Promise((resolve,reject)=>{
+        canvas.toBlob(value=>value?resolve(value):reject(Error("PNG 圖片建立失敗")),'image/png');
+      });
+      releaseCardExport();
+      exportedCardBlob=blob;
+      exportedCardUrl=URL.createObjectURL(blob);
+      output.src=exportedCardUrl;
+      download.href=exportedCardUrl;
+      download.download='CHEN-actor-card.png';
+      const open=document.getElementById('model-card-image-open');
+      if(open)open.href=exportedCardUrl;
+      const share=document.getElementById('model-card-share-button');
+      if(share)share.hidden=!supportsCardShare(blob);
       if(!dialog.open)dialog.showModal();
     }finally{
       if(button){button.disabled=false;button.removeAttribute("aria-busy")}
@@ -512,6 +540,18 @@
   document.getElementById('model-card-image-button')?.addEventListener('click',()=>{
     makeModelCardImage().catch(()=>alert('圖片產生失敗，請重新整理再試。'));
   });
+  document.getElementById('model-card-share-button')?.addEventListener('click',()=>{
+    if(!supportsCardShare(exportedCardBlob))return;
+    const file=new File([exportedCardBlob],'CHEN-actor-card.png',{type:'image/png'});
+    navigator.share({files:[file],title:'CHEN. Actor Card'}).catch(error=>{
+      if(error?.name!=='AbortError')alert('分享失敗，請長按上方圖片儲存，或點選「另開圖片」。');
+    });
+  });
+  document.getElementById('model-card-image-dialog')?.addEventListener('close',()=>{
+    // Keep the temporary URL alive until the next export or page unload,
+    // allowing iOS Safari to finish a file save or open a new tab.
+  });
+  window.addEventListener('pagehide',releaseCardExport);
   document.querySelector('[data-model-card-close]')?.addEventListener('click',()=>document.getElementById('model-card-image-dialog')?.close());
   function renderCMS(){
     if(!cmsData)return;
