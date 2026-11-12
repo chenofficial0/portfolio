@@ -422,7 +422,7 @@
     if(!card||!dialog||!output||!download)return;
     const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
     if(!ctx)return;
-    const W=960,margin=76;canvas.width=W;canvas.height=1360;
+    const W=960,margin=76;canvas.width=W;canvas.height=2600;
     ctx.fillStyle='#f8f8f7';ctx.fillRect(0,0,W,canvas.height);
     let y=margin;
     ctx.fillStyle='#888';ctx.font='18px Arial, sans-serif';ctx.fillText('CHEN. / ARTIST INFORMATION',margin,y);y+=40;
@@ -465,15 +465,11 @@
       });
       heights[column]=top-base+26;
     });
-    // Content may be taller than a phone screenshot; avoid clipping by using full dynamic height.
-    const contentBottom=base+Math.max(...heights)+margin;
-    if(contentBottom>canvas.height){
-      const expanded=document.createElement('canvas');expanded.width=W;expanded.height=Math.ceil(contentBottom);
-      const target=expanded.getContext('2d');target.fillStyle='#f8f8f7';target.fillRect(0,0,W,expanded.height);target.drawImage(canvas,0,0);
-      output.src=expanded.toDataURL('image/png');
-    }else{
-      output.src=canvas.toDataURL('image/png');
-    }
+    // Crop the export to the last visible line; keep the complete text on long cards.
+    const cropped=document.createElement('canvas');
+    cropped.width=W;cropped.height=Math.min(canvas.height,Math.max(1100,Math.ceil(contentBottom)));
+    const target=cropped.getContext('2d');target.drawImage(canvas,0,0);
+    output.src=cropped.toDataURL('image/png');
     download.href=output.src;
     dialog.showModal();
   }
