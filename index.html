@@ -101,22 +101,28 @@
 .comp-card-button{display:inline-flex;align-items:center;gap:0}
 .comp-card-button .link-arrow{margin-left:8px}
 
-/* CHEN. portraits: actual photo edges align with the text; consistent edge-to-edge gap. */
-.hero-images{display:flex;align-items:flex-start;justify-content:flex-start;gap:20px;width:min(100%,660px)}
-.hero-images .hero-visual{flex:0 0 auto;width:260px;max-width:100%;height:325px;max-height:none;aspect-ratio:auto;background:transparent;overflow:hidden;align-items:center;justify-content:center}
-.hero-images .hero-visual img{display:block;width:100%;height:100%;object-fit:contain;object-position:left top;transform:none}
+/* CHEN. home portraits: 2 desktop / 1 mobile; preserve the photos' natural ratios. */
+.hero-carousel{position:relative;width:min(100%,660px)}
+.hero-images{display:flex;align-items:flex-start;justify-content:flex-start;gap:20px;width:100%;overflow:hidden;touch-action:pan-y}
+.hero-images .hero-visual{flex:0 0 auto;max-width:100%;background:transparent;overflow:hidden}
+.hero-images .hero-visual img{display:block;width:100%;height:100%;object-fit:contain;object-position:left top}
 .hero-images .hero-visual.hero-empty,.hero-images .hero-visual.has-photo{background:transparent}
-.hero-images .hero-secondary:not(.has-photo){display:none}
 .hero-images .hero-visual.has-photo .visual-note{display:none!important}
+.hero-carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:3;border:1px solid #dedede;background:#fffef2f2;background:rgba(255,255,255,.94);width:30px;height:38px;display:grid;place-items:center;font-size:21px;line-height:1;color:#222;cursor:pointer;padding:0}
+.hero-carousel-prev{left:8px}.hero-carousel-next{right:8px}
+.hero-carousel-arrow:disabled{opacity:.3;cursor:default}
+.hero-carousel-arrow[hidden]{display:none!important}
 .comp-card-photo.has-photo,.work-thumb:has(img),.cms-gallery img,.gallery-grid img,.detail-img,.detail-gallery img{background:transparent}
 .hero-copy{width:min(100%,660px)}
 .comp-card-photo img,.work-thumb img,.gallery-grid img,.cms-gallery img,.detail-img,.detail-gallery img{object-fit:contain}
 .work-open:hover .work-thumb img{transform:none}
 @media(max-width:700px){
   /* Fill the content column: image edge aligns with the name, page margins stay even. */
+  .hero-carousel{width:100%}
   .hero-images{width:100%;gap:0;justify-content:flex-start}
-  .hero-images .hero-secondary{display:none!important}
-  .hero-images .hero-visual{width:100%;max-width:100%;aspect-ratio:auto}
+  .hero-images .hero-visual{max-width:100%;aspect-ratio:auto}
+  .hero-carousel-arrow{width:28px;height:36px}
+  .hero-carousel-prev{left:6px}.hero-carousel-next{right:6px}
 }
 .hero .name-roman-ko{font-size:12px;line-height:1.7;letter-spacing:.035em;margin:2px 0 0;white-space:normal;overflow-wrap:anywhere}
 /* Desktop: align each section's content with its numbered heading, preserving width and columns. */
@@ -168,13 +174,12 @@
 
   <main id="main">
     <section id="home" class="hero wrap">
-      <div class="hero-images">
-        <div class="hero-visual hero-empty">
-          <span class="visual-note" data-i18n="portraitPending">PORTRAIT TO BE ADDED</span>
+      <div class="hero-carousel" aria-label="首頁形象照片輪播">
+        <button type="button" class="hero-carousel-arrow hero-carousel-prev" aria-label="上一張形象照片" hidden>‹</button>
+        <div class="hero-images" aria-live="off">
+          <div class="hero-visual hero-empty"><span class="visual-note" data-i18n="portraitPending">PORTRAIT TO BE ADDED</span></div>
         </div>
-        <div class="hero-visual hero-secondary hero-empty" aria-label="首頁次要形象照片">
-          <span class="visual-note">SECOND PORTRAIT</span>
-        </div>
+        <button type="button" class="hero-carousel-arrow hero-carousel-next" aria-label="下一張形象照片" hidden>›</button>
       </div>
       <div class="hero-copy">
         <span class="eyebrow">ARTIST — TAIWAN</span>
@@ -396,30 +401,85 @@
   // Admin-managed content lives in content/site.json, not in this HTML file.
   const safeFile = (url) => typeof url === 'string' && url.trim() && isSafeUrl(url);
   const setText = (selector,text) => {const node=document.querySelector(selector);if(node && text!=null)node.textContent=String(text)};
-  // Use each image's intrinsic ratio so the visible edges (not empty grid cells)
-  // are precisely aligned and their gap remains stable for different photo ratios.
-  function resizeHeroPortraits(){
-    const holder=document.querySelector('.hero-images');
-    if(!holder)return;
-    const mobile=window.matchMedia('(max-width:700px)').matches;
-    const boxes=Array.from(holder.querySelectorAll('.hero-visual')).filter(box=>!(box.classList.contains('hero-secondary')&&(mobile||!box.classList.contains('has-photo'))));
-    if(!boxes.length)return;
-    const gap=mobile?0:20;
-    const width=holder.clientWidth;
-    if(!width)return;
-    const ratios=boxes.map(box=>{
-      const img=box.querySelector('img');
-      const ratio=img&&img.naturalWidth&&img.naturalHeight?img.naturalWidth/img.naturalHeight:4/5;
-      return Math.max(0.2,Math.min(5,ratio));
+  // The first two portraits are still understood by older published site.json files.
+  let heroPortraitUrls=[],heroStartIndex=0;
+  const heroMobile=()=>window.matchMedia('(max-width:700px)').matches;
+  function heroViewportCount(){return heroMobile()?1:2}
+  function showHeroPortraits(){
+    const track=document.querySelector('.hero-images'),root=document.querySelector('.hero-carousel');
+    if(!track||!root)return;
+    const visible=heroViewportCount(),maxStart=Math.max(0,heroPortraitUrls.length-visible);
+    heroStartIndex=Math.min(heroStartIndex,maxStart);
+    track.replaceChildren();
+    const selected=heroPortraitUrls.slice(heroStartIndex,heroStartIndex+visible);
+    if(!selected.length){
+      const fallback=document.createElement('div');fallback.className='hero-visual hero-empty';
+      const note=document.createElement('span');note.className='visual-note';note.textContent=i18n('portraitPending');
+      fallback.append(note);track.append(fallback);
+    }
+    selected.forEach((url,index)=>{
+      const frame=document.createElement('div');frame.className='hero-visual has-photo';
+      const img=document.createElement('img');img.src=url;img.alt=(document.querySelector('.hero h1')?.textContent||'CHEN.')+' — '+(heroStartIndex+index+1);
+      img.loading=heroStartIndex+index<2?'eager':'lazy';
+      img.addEventListener('load',resizeHeroPortraits,{once:true});
+      frame.append(img);track.append(frame);
     });
-    const total=ratios.reduce((sum,ratio)=>sum+ratio,0);
-    const height=mobile?Math.max(1,width/total):Math.max(1,Math.min(400,(width-gap*(boxes.length-1))/total));
-    boxes.forEach((box,index)=>{
-      box.style.width=(height*ratios[index]).toFixed(2)+'px';
-      box.style.height=height.toFixed(2)+'px';
+    const hasMore=heroPortraitUrls.length>visible;
+    const prev=root.querySelector('.hero-carousel-prev'),next=root.querySelector('.hero-carousel-next');
+    for(const arrow of [prev,next])arrow.hidden=!hasMore;
+    prev.disabled=heroStartIndex===0;
+    next.disabled=heroStartIndex===maxStart;
+    resizeHeroPortraits();
+  }
+  function resizeHeroPortraits(){
+    const track=document.querySelector('.hero-images');
+    if(!track)return;
+    const frames=Array.from(track.querySelectorAll('.hero-visual'));
+    if(!frames.length||!track.clientWidth)return;
+    const mobile=heroMobile(),gap=mobile?0:20;
+    const available=track.clientWidth-gap*(frames.length-1);
+    const ratios=frames.map(frame=>{
+      const img=frame.querySelector('img');
+      const value=img?.naturalWidth&&img?.naturalHeight?img.naturalWidth/img.naturalHeight:4/5;
+      return Math.max(.2,Math.min(5,value));
+    });
+    const height=mobile?available/ratios[0]:Math.min(400,available/ratios.reduce((a,b)=>a+b,0));
+    frames.forEach((frame,i)=>{
+      frame.style.width=Math.max(1,height*ratios[i]).toFixed(2)+'px';
+      frame.style.height=Math.max(1,height).toFixed(2)+'px';
     });
   }
-  window.addEventListener('resize',resizeHeroPortraits);
+  function stepHero(direction){
+    const max=Math.max(0,heroPortraitUrls.length-heroViewportCount());
+    heroStartIndex=Math.max(0,Math.min(max,heroStartIndex+direction));
+    showHeroPortraits();
+  }
+  document.querySelector('.hero-carousel-prev')?.addEventListener('click',()=>stepHero(-1));
+  document.querySelector('.hero-carousel-next')?.addEventListener('click',()=>stepHero(1));
+  const heroTrack=document.querySelector('.hero-images');
+  let heroTouchX=null,heroTouchY=null;
+  heroTrack?.addEventListener('touchstart',event=>{
+    if(event.touches.length!==1)return;
+    heroTouchX=event.touches[0].clientX;heroTouchY=event.touches[0].clientY;
+  },{passive:true});
+  heroTrack?.addEventListener('touchend',event=>{
+    if(heroTouchX===null||!event.changedTouches.length)return;
+    const dx=event.changedTouches[0].clientX-heroTouchX;
+    const dy=event.changedTouches[0].clientY-heroTouchY;
+    heroTouchX=null;heroTouchY=null;
+    if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.2)stepHero(dx<0?1:-1);
+  },{passive:true});
+  let lastHeroMobile=heroMobile();
+  window.addEventListener('resize',()=>{
+    if(lastHeroMobile!==heroMobile()){lastHeroMobile=heroMobile();showHeroPortraits()}
+    else resizeHeroPortraits();
+  });
+  function setHeroPortraits(about){
+    const urls=Array.isArray(about.hero_images)
+      ?about.hero_images.map(item=>typeof item==='string'?item:item?.image).filter(safeFile).slice(0,30)
+      :[about.hero_image,about.hero_image_secondary].filter(safeFile);
+    heroPortraitUrls=urls;heroStartIndex=0;showHeroPortraits();
+  }
   const mediaImage = (selector,url,alt) => {
     const box=document.querySelector(selector);if(!box)return;
     const old=box.querySelector('img');if(old)old.remove();
@@ -589,8 +649,7 @@
     const birth=document.querySelector('.facts > div:first-child');
     if(birth){birth.hidden=!a.show_birth_year;setText('.facts > div:first-child dd',a.birth_year||'')}
     const bio=document.getElementById('bio');if(bio)bio.textContent=choose(a,'bio');
-    mediaImage('.hero-images .hero-visual:not(.hero-secondary)',a.hero_image,name);
-    mediaImage('.hero-images .hero-secondary',a.hero_image_secondary,name+' — second portrait');
+    setHeroPortraits(a);
     mediaImage('.comp-card-photo',p.photo,name);
     setText('[data-profile-row="location"] dd',a.based_in||'');
     setText('[data-profile-row="languages"] dd',language==='en'?'Mandarin / English / Korean':language==='ko'?'중국어 / 영어 / 한국어':(a.languages||[]).join(' / '));
