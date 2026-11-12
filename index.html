@@ -133,6 +133,13 @@
 .comp-card-group dd{margin:0;font-size:11px;color:#333;overflow-wrap:anywhere}
 .comp-card-actions:empty,.comp-card-note[hidden]{display:none}
 @media(max-width:700px){.comp-card-facts{grid-template-columns:1fr;row-gap:19px}.comp-card-facts .comp-card-group dl>div{grid-template-columns:102px minmax(0,1fr)}}
+/* Saveable image preview for the artist card; native browser context menu handles saving. */
+.comp-card-export{margin-top:3px;cursor:pointer}
+.model-card-image-dialog{border:0;padding:25px 20px 20px;width:min(560px,calc(100% - 30px));max-height:92vh;overflow:auto;background:#fff;box-shadow:0 20px 80px #0003;position:fixed}
+.model-card-image-dialog::backdrop{background:#0009}
+.model-card-image-dialog img{width:100%;height:auto;display:block;user-select:auto;-webkit-touch-callout:default}
+.model-card-image-hint{font-size:11px;color:#777;margin:14px 25px 16px 0}
+.model-card-image-dialog #model-card-image-download{margin-top:16px}
 </style>
   
 </head>
@@ -239,6 +246,7 @@
               </section>
             </div>
             <div class="comp-card-actions" aria-label="Profile documents and videos"></div>
+            <button type="button" id="model-card-image-button" class="comp-card-button comp-card-export">儲存資料卡圖片</button>
           </div>
         </div>
       </div>
@@ -266,6 +274,12 @@
   </main>
   <footer class="wrap footer"><span>© CHEN. 2026</span><span>ARTIST · TAIWAN</span><a href="#home">BACK TO TOP <svg class="link-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></a></footer>
 
+  <dialog id="model-card-image-dialog" class="model-card-image-dialog" aria-label="可儲存的演員資料卡圖片">
+    <button class="dialog-close" type="button" data-model-card-close aria-label="關閉">×</button>
+    <p class="model-card-image-hint">手機長按圖片，或電腦按右鍵選擇儲存圖片。</p>
+    <img id="model-card-image" alt="演員資料卡，可長按或按右鍵儲存">
+    <a id="model-card-image-download" class="comp-card-button" href="#" download="CHEN-actor-card.png">下載 PNG 圖片</a>
+  </dialog>
   <dialog id="work-dialog" class="work-dialog" aria-label="Work details">
     <button class="dialog-close" type="button" data-close aria-label="Close">×</button>
     <div id="work-dialog-body"></div>
@@ -400,11 +414,78 @@
     if(safeFile(url)){const img=document.createElement('img');img.src=url;img.alt=alt;img.loading=selector.includes('hero')?'eager':'lazy';if(box.closest('.hero-images'))img.addEventListener('load',resizeHeroPortraits);box.prepend(img)}
     if(box.closest('.hero-images'))resizeHeroPortraits();
   };
+  // A real <img> lets mobile browsers offer Save Image on long-press and desktop
+  // browsers offer Save Image As in the native right-click menu.
+  async function makeModelCardImage(){
+    const card=document.querySelector('.comp-card'),dialog=document.getElementById('model-card-image-dialog');
+    const output=document.getElementById('model-card-image'),download=document.getElementById('model-card-image-download');
+    if(!card||!dialog||!output||!download)return;
+    const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+    if(!ctx)return;
+    const W=960,margin=76;canvas.width=W;canvas.height=1360;
+    ctx.fillStyle='#f8f8f7';ctx.fillRect(0,0,W,canvas.height);
+    let y=margin;
+    ctx.fillStyle='#888';ctx.font='18px Arial, sans-serif';ctx.fillText('CHEN. / ARTIST INFORMATION',margin,y);y+=40;
+    const photo=card.querySelector('.comp-card-photo img');
+    if(photo?.src){
+      try{
+        const image=new Image();image.crossOrigin='anonymous';
+        await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=photo.src});
+        const maxW=W-2*margin,maxH=510,scale=Math.min(maxW/image.naturalWidth,maxH/image.naturalHeight);
+        const dw=image.naturalWidth*scale,dh=image.naturalHeight*scale;
+        ctx.drawImage(image,margin,y,dw,dh);y+=dh+38;
+      }catch(_){y+=12}
+    }
+    ctx.fillStyle='#222';ctx.font='38px Arial, "Noto Sans TC", sans-serif';
+    ctx.fillText(card.querySelector('.comp-card-name')?.textContent||'姜翊',margin,y);y+=40;
+    ctx.fillStyle='#666';ctx.font='20px Arial, "Noto Sans KR", sans-serif';
+    ctx.fillText(card.querySelector('.comp-card-names')?.textContent||'CHIANG YI．강익',margin,y);y+=44;
+    const groups=Array.from(card.querySelectorAll('.comp-card-group'));
+    function wrapCanvasText(txt,x,top,maxW){
+      ctx.font='17px Arial, "Noto Sans TC", "Noto Sans KR", sans-serif';
+      let line='',rows=0;
+      for(const char of String(txt||'')){
+        if(ctx.measureText(line+char).width>maxW&&line){ctx.fillText(line,x,top+rows*26);rows++;line=char}
+        else line+=char;
+      }
+      if(line){ctx.fillText(line,x,top+rows*26);rows++}
+      return Math.max(1,rows)*26;
+    }
+    const colW=(W-2*margin-38)/2,base=y,heights=[0,0];
+    groups.forEach((group,index)=>{
+      const column=index===1?1:0;
+      const x=margin+column*(colW+38);
+      let top=base+heights[column];
+      ctx.fillStyle='#999';ctx.font='17px Arial, sans-serif';
+      ctx.fillText((group.querySelector('h4')?.textContent||'').toUpperCase(),x,top);top+=34;
+      group.querySelectorAll('dl>div:not([hidden])').forEach(row=>{
+        const term=row.querySelector('dt')?.textContent||'',value=row.querySelector('dd')?.textContent||'';
+        ctx.fillStyle='#999';ctx.font='17px Arial, sans-serif';ctx.fillText(term,x,top);
+        ctx.fillStyle='#333';top+=wrapCanvasText(value,x+130,top,Math.max(70,colW-135))+13;
+      });
+      heights[column]=top-base+26;
+    });
+    // Content may be taller than a phone screenshot; avoid clipping by using full dynamic height.
+    const contentBottom=base+Math.max(...heights)+margin;
+    if(contentBottom>canvas.height){
+      const expanded=document.createElement('canvas');expanded.width=W;expanded.height=Math.ceil(contentBottom);
+      const target=expanded.getContext('2d');target.fillStyle='#f8f8f7';target.fillRect(0,0,W,expanded.height);target.drawImage(canvas,0,0);
+      output.src=expanded.toDataURL('image/png');
+    }else{
+      output.src=canvas.toDataURL('image/png');
+    }
+    download.href=output.src;
+    dialog.showModal();
+  }
+  document.getElementById('model-card-image-button')?.addEventListener('click',()=>{
+    makeModelCardImage().catch(()=>alert('圖片產生失敗，請重新整理再試。'));
+  });
+  document.querySelector('[data-model-card-close]')?.addEventListener('click',()=>document.getElementById('model-card-image-dialog')?.close());
   function renderCMS(){
     if(!cmsData)return;
     const a=cmsData.about||{},p=cmsData.profile||{},c=cmsData.contact||{};
     about=a;
-    const name=choose(a,'name')||'姜翊';
+    const name=a.name_zh||'姜翊';
     setText('.hero h1',name);
     setText('.hero .name-roman-ko',[a.name_en,a.name_ko].filter(Boolean).join('．'));
     setText('.comp-card-name',name);
@@ -470,7 +551,13 @@
           if(!item||typeof item.label!=='string'||!item.label.trim()||!safeFile(item.url))continue;
           const label=String(item['label_'+language]||item.label||'').trim();
           const link=setArrowLabel(el('a','comp-card-button'),label);
-          link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';buttons.append(link);
+          link.href=item.url;
+          const extension={pdf:'pdf',jpg:'jpg',png:'png'}[item.kind];
+          if(extension){
+            link.download='CHEN-'+label.replace(/[^a-zA-Z0-9\u4e00-\u9fff\uac00-\ud7a3_-]/g,'-').slice(0,45)+'.'+extension;
+            link.setAttribute('aria-label',label+' — 下載檔案');
+          }else{link.target='_blank';link.rel='noopener noreferrer';}
+          buttons.append(link);
         }
       }
     }
