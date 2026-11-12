@@ -450,6 +450,13 @@
       for(const [label,url] of [['Instagram',c.instagram],['Social',c.other_url]]){
         if(safeFile(url)){const link=setArrowLabel(el('a','cms-social-link'),label);link.href=url;link.target='_blank';link.rel='noopener noreferrer';contacts.append(link)}
       }
+      if(Array.isArray(c.links)){
+        for(const entry of c.links.slice(0,30)){
+          if(!entry||typeof entry.label!=='string'||!entry.label.trim()||!safeFile(entry.url))continue;
+          const link=setArrowLabel(el('a','cms-social-link'),entry.label.trim());
+          link.href=entry.url;link.target='_blank';link.rel='noopener noreferrer';contacts.append(link);
+        }
+      }
     }
     const works=document.querySelector('#filmography .section-body');
     if(works){
