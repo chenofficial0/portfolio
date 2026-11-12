@@ -525,11 +525,14 @@
     if(buttons){
       buttons.replaceChildren();
       const opts=[['model_card_pdf','modelCardAction','pdf'],['resume_pdf','resumeAction','pdf'],['showreel_url','showreelAction','url']];
-      for(const [field,label,type] of opts){
+      for(const [field,label,legacyKind] of opts){
         const url=p[field];
         if(!safeFile(url))continue;
+        const explicit=p[field+'_kind'];
+        const inferred=/\\.pdf(?:\\?|$)/i.test(url)?'pdf':/\\.png(?:\\?|$)/i.test(url)?'png':/\\.jpe?g(?:\\?|$)/i.test(url)?'jpg':legacyKind;
+        const kind=['url','pdf','jpg','png'].includes(explicit)?explicit:inferred;
         let node;
-        if(type==='pdf'){
+        if(kind==='pdf'){
           node=setArrowLabel(el('button','comp-card-button'),i18n(label));
           node.type='button';
           node.addEventListener('click',()=>{
@@ -539,7 +542,11 @@
           });
         }else{
           node=setArrowLabel(el('a','comp-card-button'),i18n(label));
-          node.href=url;node.target='_blank';node.rel='noopener noreferrer';
+          node.href=url;
+          if(kind==='jpg'||kind==='png'){
+            node.download='CHEN-'+field+'.'+kind;
+            node.setAttribute('aria-label',i18n(label)+' — 下載圖片');
+          }else{node.target='_blank';node.rel='noopener noreferrer'}
         }
         buttons.append(node);
       }
