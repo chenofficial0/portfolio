@@ -7,7 +7,7 @@ workers_dev = true
 # Create it with: npx wrangler kv namespace create STUDIO_KV
 [[kv_namespaces]]
 binding = "STUDIO_KV"
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "f5115459b9a0488186850f92f1ee8cfc"
 
 [vars]
 # Staging is read-only until security tests and explicit approval.
