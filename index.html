@@ -203,6 +203,7 @@
     en: {profilePhotoPending:'PORTRAIT TO BE ADDED',profileLocation:'BASED IN',profileLanguages:'LANGUAGES',profileLanguagesValue:'Mandarin / English / Korean',profileHeight:'HEIGHT',profileSkills:'SKILLS',toAdd:'TO BE ADDED',modelCardAction:'MODEL CARD ↗',resumeAction:'ARTIST RÉSUMÉ ↗',showreelAction:'SHOWREEL ↗',profileLinksPending:'Links will be available when files are added.',viewWork:'VIEW WORK',portraitPending:'PORTRAIT TO BE ADDED',introLead:'Artist profile',birthYear:'BIRTH YEAR',basedIn:'BASED IN',languages:'LANGUAGES',noWorks:'SELECTED WORKS WILL APPEAR HERE.',modelCardHint:'Preview online and download PDF.',actorProfileHint:'Artist résumé in PDF format.',preview:'PREVIEW',download:'DOWNLOAD PDF',comingSoon:'COMING SOON',showreelHint:'Selected performance clips.',watch:'WATCH ↗',noPhotos:'SELECTED PHOTOGRAPHS WILL APPEAR HERE.',collaboration:'FOR COLLABORATIONS & INQUIRIES',contactTypes:'Acting · Commercial & Brand · Modeling · Management',emailPending:'WORK EMAIL TO BE ADDED',openPdf:'OPEN PDF ↗',pdfFallback:'If your device cannot display the PDF, use OPEN PDF.',production:'Production / Brand',role:'Role',year:'Year',type:'Category',video:'WATCH VIDEO ↗',close:'Close'},
     ko: {profilePhotoPending:'프로필 사진 준비 중',profileLocation:'활동 지역',profileLanguages:'언어',profileLanguagesValue:'중국어 / 영어 / 한국어',profileHeight:'키',profileSkills:'특기',toAdd:'추후 업데이트',modelCardAction:'모델 카드 ↗',resumeAction:'배우 이력서 ↗',showreelAction:'연기 영상 ↗',profileLinksPending:'파일과 영상 링크가 등록되면 열람할 수 있습니다.',viewWork:'작품 보기',portraitPending:'프로필 사진 준비 중',introLead:'배우 프로필',birthYear:'출생 연도',basedIn:'활동 지역',languages:'언어',noWorks:'작품 정보 준비 중',modelCardHint:'온라인 미리보기 및 PDF 다운로드',actorProfileHint:'배우 이력서 PDF',preview:'미리보기',download:'PDF 다운로드',comingSoon:'준비 중',showreelHint:'연기 영상',watch:'영상 보기 ↗',noPhotos:'갤러리 준비 중',collaboration:'캐스팅 및 협업 문의',contactTypes:'출연 · 광고 및 브랜드 · 모델 · 매니지먼트',emailPending:'업무용 이메일 준비 중',openPdf:'PDF 열기 ↗',pdfFallback:'PDF가 표시되지 않으면 「PDF 열기」를 이용해 주세요.',production:'제작사 / 브랜드',role:'배역',year:'연도',type:'유형',video:'영상 보기 ↗',close:'닫기'}
   };
+  let cmsData = null;
   let content = {};
   try { content = JSON.parse(document.querySelector('#site-content')?.textContent || '{}'); } catch (_) {}
   let about = content.about || {};
@@ -262,7 +263,6 @@
   document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog')?.close()));
 
   // Admin-managed content lives in content/site.json, not in this HTML file.
-  let cmsData = null;
   const safeFile = (url) => typeof url === 'string' && url.trim() && isSafeUrl(url);
   const setText = (selector,text) => {const node=document.querySelector(selector);if(node && text!=null)node.textContent=String(text)};
   const mediaImage = (selector,url,alt) => {
