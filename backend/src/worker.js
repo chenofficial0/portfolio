@@ -6,6 +6,8 @@
  */
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
+// Fail closed: this deployment must never write to the live Pages branch.
+const CONTENT_BRANCH="feature/secure-content-studio-api";
 const PUBLIC_STUDIO="https://chenofficial0.github.io/portfolio/admin/studio.html";
 const GITHUB_API="https://api.github.com";
 const utf8=new TextEncoder();
@@ -105,7 +107,7 @@ async function auth(request,env){
   authURL.searchParams.set("redirect_uri",base+"/auth/callback");
   authURL.searchParams.set("scope","public_repo read:user");
   authURL.searchParams.set("state",state);
-  const r=Response.redirect(authURL.toString(),302);
+  const r=new Response(null,{status:302,headers:{Location:authURL.toString()}});
   r.headers.set("Set-Cookie",cookie("chen_oauth_state",state,600));
   r.headers.set("Cache-Control","no-store");
   return r;
@@ -131,19 +133,20 @@ async function callback(request,env){
   const sid=random(),csrf=random();
   const info={login:user.login,csrf,token:t.access_token,exp:Date.now()+6*3600*1000};
   await env.STUDIO_KV.put("session:"+await digest(sid),await encrypt(env,info),{expirationTtl:6*3600});
-  const r=Response.redirect(base+"/studio",302);
+  const r=new Response(null,{status:302,headers:{Location:base+"/studio"}});
   r.headers.append("Set-Cookie",cookie("chen_session",sid,21600));
   r.headers.append("Set-Cookie",cookie("chen_oauth_state","",0));
   r.headers.set("Cache-Control","no-store");
   return r;
 }
 async function getContent(session){
-  const raw=await github("/repos/"+REPO+"/contents/"+CONTENT_PATH+"?ref=main",session.token);
+  const raw=await github("/repos/"+REPO+"/contents/"+CONTENT_PATH+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
   if(!raw.content||!raw.sha)return fail("Missing website content",502);
   const text=new TextDecoder().decode(Uint8Array.from(atob(raw.content.replace(/\s/g,"")),c=>c.charCodeAt(0)));
   return json({data:JSON.parse(text),sha:raw.sha});
 }
-async function saveContent(request,session){
+async function saveContent(request,session,env){
+  if(env.ENABLE_CONTENT_WRITES!=="true")return fail("Content writes are disabled pending security approval",403);
   if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
   const length=Number(request.headers.get("content-length")||0);
   if(length>262144)return fail("Payload too large",413);
@@ -155,7 +158,7 @@ async function saveContent(request,session){
     const response=await github("/repos/"+REPO+"/contents/"+CONTENT_PATH,session.token,{
       method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({
         message:"Update CHEN. website content via Content Studio",
-        content:encoded,sha:input.sha,branch:"main"
+        content:encoded,sha:input.sha,branch:CONTENT_BRANCH
       })
     });
     return json({ok:true,sha:response.content?.sha||null,commit:response.commit?.sha||null});
@@ -196,7 +199,7 @@ export default {
       if(method==="GET"&&path==="/api/content")return getContent(s);
       if(method==="PUT"&&path==="/api/content"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
-        return saveContent(request,s);
+        return saveContent(request,s,env);
       }
       return fail("Not found",404);
     }catch(err){
