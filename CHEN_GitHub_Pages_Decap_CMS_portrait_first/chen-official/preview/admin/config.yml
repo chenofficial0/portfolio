@@ -1,0 +1,111 @@
+# REQUIRED BEFORE ADMIN LOGIN:
+# 1. Replace YOUR_GITHUB_USERNAME with the actual repository owner.
+# 2. Set up a GitHub OAuth proxy (external service) and uncomment base_url/auth_endpoint.
+# 3. Never place GitHub OAuth client secrets in this public file.
+backend:
+  name: github
+  repo: YOUR_GITHUB_USERNAME/chen-official
+  branch: main
+  # base_url: https://YOUR-OAUTH-PROXY.example.com
+  # auth_endpoint: auth
+
+local_backend: true
+publish_mode: editorial_workflow
+media_folder: static/assets/images/uploads
+public_folder: /assets/images/uploads
+
+collections:
+  - name: works
+    label: 作品管理
+    label_singular: 作品
+    folder: content/works
+    create: true
+    extension: json
+    format: json
+    identifier_field: title
+    slug: "{{slug}}"
+    summary: "{{year}} — {{title}}"
+    sortable_fields: [title, year]
+    fields:
+      - { label: 作品名稱（中文／預設）, name: title, widget: string }
+      - { label: 作品名稱（英文）, name: title_en, widget: string, required: false }
+      - { label: 作品名稱（韓文）, name: title_ko, widget: string, required: false }
+      - { label: 年份, name: year, widget: number, value_type: int, min: 1900, max: 2100 }
+      - { label: 製作公司／品牌, name: production, widget: string, required: false }
+      - { label: 角色（中文）, name: role_zh, widget: string, required: false }
+      - { label: 角色（英文）, name: role_en, widget: string, required: false }
+      - { label: 角色（韓文）, name: role_ko, widget: string, required: false }
+      - label: 演出類型
+        name: category
+        widget: select
+        options: [Film, Drama, Commercial, Music Video, Modeling, Other]
+      - { label: 作品封面, name: cover, widget: image, required: false }
+      - label: 作品劇照
+        name: stills
+        widget: list
+        required: false
+        fields:
+          - { label: 劇照, name: image, widget: image }
+          - { label: 圖片說明, name: caption, widget: string, required: false }
+      - { label: 公開授權影片連結, name: video_url, widget: string, required: false, hint: 僅填寫有權公開分享的 https 網址 }
+      - { label: 影片顯示名稱, name: video_label, widget: string, required: false }
+      - { label: 首頁精選, name: featured, widget: boolean, default: false }
+      - { label: 同年排序（數字越小越前）, name: sort_order, widget: number, value_type: int, default: 0 }
+      - { label: 是否公開, name: visible, widget: boolean, default: true }
+
+  - name: pages
+    label: 網站內容
+    files:
+      - name: about
+        label: 個人簡介
+        file: content/about.json
+        format: json
+        fields:
+          - { label: 中文姓名, name: name_zh, widget: string }
+          - { label: 英文姓名, name: name_en, widget: string }
+          - { label: 韓文姓名, name: name_ko, widget: string }
+          - { label: 出生年份, name: birth_year, widget: number, value_type: int, required: false }
+          - { label: 公開出生年份, name: show_birth_year, widget: boolean, default: true }
+          - { label: 所屬地區, name: based_in, widget: string }
+          - { label: 語言能力, name: languages, widget: list, field: {label: 語言, name: language, widget: string} }
+          - { label: 中文個人簡介, name: bio_zh, widget: text, required: false }
+          - { label: 英文個人簡介, name: bio_en, widget: text, required: false }
+          - { label: 韓文個人簡介, name: bio_ko, widget: text, required: false }
+          - { label: 首頁形象照, name: hero_image, widget: image, required: false }
+      - name: profile
+        label: 模特卡與履歷
+        file: content/profile.json
+        format: json
+        fields:
+          - { label: 模特卡 PDF, name: model_card_pdf, widget: file, required: false, media_folder: /static/assets/documents, public_folder: /assets/documents }
+          - { label: 演員履歷 PDF, name: actor_profile_pdf, widget: file, required: false, media_folder: /static/assets/documents, public_folder: /assets/documents }
+          - { label: 演出作品影片連結, name: showreel_url, widget: string, required: false }
+      - name: gallery
+        label: 攝影作品
+        file: content/gallery.json
+        format: json
+        fields:
+          - label: 照片
+            name: photos
+            widget: list
+            required: false
+            fields:
+              - { label: 照片, name: image, widget: image }
+              - { label: 圖說, name: caption, widget: string, required: false }
+      - name: contact
+        label: 合作聯絡
+        file: content/contact.json
+        format: json
+        fields:
+          - { label: 工作專用信箱, name: work_email, widget: string, required: false }
+          - { label: Instagram 網址, name: instagram_url, widget: string, required: false }
+          - { label: 其他社群網址, name: other_social_url, widget: string, required: false }
+      - name: settings
+        label: 網站設定
+        file: content/settings.json
+        format: json
+        fields:
+          - { label: 品牌名稱, name: brand, widget: string }
+          - { label: 瀏覽器標題, name: site_title, widget: string }
+          - { label: 網站描述, name: site_description, widget: text }
+          - { label: 正式網域網址, name: canonical_url, widget: string }
