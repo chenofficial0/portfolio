@@ -83,6 +83,13 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
 .fixed-resource-entry h3{font-size:12px;font-weight:500;margin:0 0 14px}
 .fixed-resource-entry .profile-resource-control{grid-template-columns:minmax(0,1fr) minmax(0,1.7fr);align-items:start}
 @media(max-width:700px){.fixed-resource-entry .profile-resource-control{grid-template-columns:1fr}}
+.hero-photo-list{display:grid;gap:14px}
+.hero-photo-list .toolbar-note{font-size:11px;line-height:1.8}
+.hero-photo-list-items{display:grid;gap:15px}
+.hero-photo-entry{padding:15px;border:1px solid var(--line);display:grid;gap:12px}
+.hero-photo-entry .photo-uploader{background:#fafaf9}
+.hero-photo-entry .still-top strong{font-size:12px;font-weight:500}
+.hero-photo-list>.btn{justify-self:start}
 </style>
 </head>
 <body>
@@ -127,8 +134,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     ["name_zh","中文姓名"],["name_en","英文姓名"],["name_ko","韓文姓名"],
     ["birth_year","出生年份","number"],["show_birth_year","公開出生年份","checkbox"],["based_in","所屬地區"],
     ["languages","語言能力（以逗號分隔）","languages"],
-    ["hero_image","首頁主要照片（電腦及手機）","photo"],
-    ["hero_image_secondary","首頁次要照片（僅電腦版顯示）","photo"],
+    ["hero_images","首頁形象照片輪播","heroList"],
     ["bio_zh","中文簡介","textarea"],["bio_en","英文簡介","textarea"],["bio_ko","韓文簡介","textarea"]
   ];
   const profileFields=[
@@ -313,9 +319,48 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     }));
     wrap.append(top,collection);refresh();return wrap;
   }
+  function heroGalleryEditor(about){
+    const box=el("section","hero-photo-list");
+    box.append(el("p","toolbar-note","電腦版每次顯示兩張，手機版每次顯示一張；新增照片後會自動出現切換箭頭，最多 30 張。第一張為預設首張。"));
+    // Seamlessly keep legacy home portraits when switching to the gallery editor.
+    if(!Array.isArray(about.hero_images)){
+      about.hero_images=[about.hero_image,about.hero_image_secondary].filter(x=>typeof x==="string"&&x.trim()).map(image=>({image}));
+    }
+    const list=el("div","hero-photo-list-items");box.append(list);
+    const draw=()=>{
+      list.replaceChildren();
+      about.hero_images.forEach((entry,i)=>{
+        const item=el("div","hero-photo-entry");
+        const head=el("div","still-top"),title=el("strong","",i===0?"第 1 張 · 首頁預設照片":"第 "+(i+1)+" 張");
+        const actions=el("div","entry-actions");
+        const up=btn("↑",()=>{
+          if(i===0)return;
+          [about.hero_images[i-1],about.hero_images[i]]=[about.hero_images[i],about.hero_images[i-1]];
+          markDirty();draw();
+        });up.disabled=i===0;up.setAttribute("aria-label","上移首頁照片");
+        const down=btn("↓",()=>{
+          if(i===about.hero_images.length-1)return;
+          [about.hero_images[i],about.hero_images[i+1]]=[about.hero_images[i+1],about.hero_images[i]];
+          markDirty();draw();
+        });down.disabled=i===about.hero_images.length-1;down.setAttribute("aria-label","下移首頁照片");
+        const remove=btn("刪除",()=>{
+          if(!confirm("確定從首頁輪播清單移除此張照片？已上傳的檔案不會因此從 GitHub 刪除。"))return;
+          clearPhoto(entry,"image");about.hero_images.splice(i,1);markDirty();draw();
+        });
+        actions.append(up,down,remove);head.append(title,actions);
+        item.append(head,createPhotoEditor(entry,"image","形象照 "+(i+1)));list.append(item);
+      });
+    };
+    const add=btn("＋ 新增首頁照片",()=>{
+      if(about.hero_images.length>=30){alert("最多 30 張首頁照片");return}
+      about.hero_images.push({image:""});markDirty();draw();
+    },"btn dark");
+    box.append(add);draw();return box;
+  }
   function fieldRow(obj,f){
     const [key,label,type]=f;
     if(type==="photo")return createPhotoEditor(obj,key,label);
+    if(type==="heroList")return heroGalleryEditor(obj);
     if(type==="photoList")return createStillsEditor(obj);
     const wrapper=el("div","field"+(type==="textarea"?" full":""));
     let input;
@@ -388,7 +433,9 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
           seen.add(match[1]);grid.append(translatedField(obj,group));continue;
         }
       }
-      grid.append(fieldRow(obj,f));
+      if(f[2]==="heroList"){
+        const full=el("div","field full");full.append(el("label","","首頁形象照片"),fieldRow(obj,f));grid.append(full);
+      }else grid.append(fieldRow(obj,f));
     }
     container.append(grid);
   }
