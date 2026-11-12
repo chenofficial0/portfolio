@@ -529,7 +529,7 @@
         const url=p[field];
         if(!safeFile(url))continue;
         const explicit=p[field+'_kind'];
-        const inferred=/\\.pdf(?:\\?|$)/i.test(url)?'pdf':/\\.png(?:\\?|$)/i.test(url)?'png':/\\.jpe?g(?:\\?|$)/i.test(url)?'jpg':legacyKind;
+        const inferred=/\.pdf(?:\?|$)/i.test(url)?'pdf':/\.png(?:\?|$)/i.test(url)?'png':/\.jpe?g(?:\?|$)/i.test(url)?'jpg':legacyKind;
         const kind=['url','pdf','jpg','png'].includes(explicit)?explicit:inferred;
         let node;
         if(kind==='pdf'){
