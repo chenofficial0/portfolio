@@ -13,7 +13,7 @@ id = "f5115459b9a0488186850f92f1ee8cfc"
 # Staging is read-only until security tests and explicit approval.
 ENABLE_CONTENT_WRITES = "false"
 # Must match the exact deployed API origin, e.g. https://chen-content-studio-api.YOUR-SUBDOMAIN.workers.dev
-PUBLIC_API_ORIGIN = "https://REPLACE_WITH_YOUR_WORKER_ORIGIN"
+PUBLIC_API_ORIGIN = "https://chen-content-studio-api.clyichen0312.workers.dev"
 GITHUB_CLIENT_ID = "REPLACE_WITH_GITHUB_OAUTH_CLIENT_ID"
 
 # Secrets (set with wrangler secret put; NEVER commit them):
