@@ -113,9 +113,10 @@
 .comp-card-photo img,.work-thumb img,.gallery-grid img,.cms-gallery img,.detail-img,.detail-gallery img{object-fit:contain}
 .work-open:hover .work-thumb img{transform:none}
 @media(max-width:700px){
-  .hero-images{width:100%;gap:0}
+  /* Symmetric breathing room within the page margins, independent of photo aspect ratio. */
+  .hero-images{width:100%;gap:0;justify-content:center}
   .hero-images .hero-secondary{display:none!important}
-  .hero-images .hero-visual{max-width:100%;aspect-ratio:auto}
+  .hero-images .hero-visual{max-width:calc(100% - 24px);aspect-ratio:auto}
 }
 .hero .name-roman-ko{font-size:12px;line-height:1.7;letter-spacing:.035em;margin:2px 0 0;white-space:normal;overflow-wrap:anywhere}
 </style>
@@ -352,7 +353,7 @@
     const boxes=Array.from(holder.querySelectorAll('.hero-visual')).filter(box=>!(box.classList.contains('hero-secondary')&&(mobile||!box.classList.contains('has-photo'))));
     if(!boxes.length)return;
     const gap=mobile?0:20;
-    const width=holder.clientWidth;
+    const width=mobile?Math.max(1,holder.clientWidth-24):holder.clientWidth;
     if(!width)return;
     const ratios=boxes.map(box=>{
       const img=box.querySelector('img');
