@@ -1,4 +1,4 @@
-name = "chen-content-studio-api-staging"
+name = "chen-content-studio-api"
 main = "src/worker.js"
 compatibility_date = "2026-11-12"
 workers_dev = true
@@ -10,7 +10,7 @@ binding = "STUDIO_KV"
 id = "f5115459b9a0488186850f92f1ee8cfc"
 
 [vars]
-# Staging is read-only until security tests and explicit approval.
+# Worker remains read-only until security tests and explicit approval.
 ENABLE_CONTENT_WRITES = "false"
 # Must match the exact deployed API origin, e.g. https://chen-content-studio-api.YOUR-SUBDOMAIN.workers.dev
 PUBLIC_API_ORIGIN = "https://chen-content-studio-api.clyichen0312.workers.dev"
