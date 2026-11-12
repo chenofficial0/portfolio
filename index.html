@@ -410,7 +410,7 @@
   const setText = (selector,text) => {const node=document.querySelector(selector);if(node && text!=null)node.textContent=String(text)};
   // Build two full-width pages during motion so photos slide rather than pop in.
   // Older content/site.json files with two fixed image fields remain supported.
-  let heroPortraitUrls=[],heroStartIndex=0,heroAnimating=false,heroAnimationToken=0;
+  let heroPortraitUrls=[],heroStartIndex=0,heroAnimating=false,heroAnimationToken=0,heroRendered=false;
   const heroMobile=()=>window.matchMedia('(max-width:700px)').matches;
   const heroViewportCount=()=>heroMobile()?1:2;
   const heroReducedMotion=()=>window.matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -464,7 +464,7 @@
   }
   function showHeroPortraits(){
     const viewport=document.querySelector('.hero-images');if(!viewport)return;
-    heroAnimationToken++;heroAnimating=false;
+    heroAnimationToken++;heroAnimating=false;heroRendered=true;
     heroStartIndex=Math.min(heroStartIndex,Math.max(0,heroPortraitUrls.length-heroViewportCount()));
     const strip=document.createElement('div');strip.className='hero-strip';
     strip.append(createHeroPage(heroStartIndex));viewport.replaceChildren(strip);
@@ -494,7 +494,15 @@
     let finished=false;
     const finish=()=>{
       if(finished||token!==heroAnimationToken)return;
-      finished=true;heroStartIndex=target;showHeroPortraits();
+      finished=true;
+      // Keep the already decoded incoming images; rebuilding here causes a visible flash.
+      strip.classList.remove('is-sliding');
+      strip.style.transform='translate3d(0,0,0)';
+      strip.replaceChildren(incoming);
+      heroStartIndex=target;
+      heroAnimating=false;
+      resizeHeroPortraits();
+      updateHeroArrows();
     };
     strip.addEventListener('transitionend',event=>{
       if(event.target===strip&&event.propertyName==='transform')finish();
@@ -535,7 +543,7 @@
       ?about.hero_images.map(item=>typeof item==='string'?item:item?.image).filter(safeFile).slice(0,30)
       :[about.hero_image,about.hero_image_secondary].filter(safeFile);
     const changed=urls.length!==heroPortraitUrls.length||urls.some((url,i)=>url!==heroPortraitUrls[i]);
-    if(!changed)return;
+    if(!changed&&heroRendered)return;
     heroPortraitUrls=urls;heroStartIndex=0;showHeroPortraits();
   }
   const mediaImage = (selector,url,alt) => {
