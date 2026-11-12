@@ -260,17 +260,26 @@ async function uploadResource(request,session,env){
   }catch(e){return fail("Could not upload actor resource",e.http===403?403:502)}
 }
 const STAGED_IMAGE_PATH=/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg$/;
+async function readStagedAsset(session,relative){
+  if(!STAGED_IMAGE_PATH.test(relative)&&!RESOURCE_REF.test(relative))throw Error("Invalid staged path");
+  const asset=await github("/repos/"+REPO+"/contents/"+relative+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
+  const max=RESOURCE_REF.test(relative)?RESOURCE_MAX_BYTES:1572864;
+  if(asset.type!=="file"||!asset.sha||!Number.isInteger(asset.size)||asset.size<100||asset.size>max)throw Error("Invalid staged media metadata");
+  // GitHub Contents API may omit Base64 content for files larger than 1 MiB.
+  const payload=asset.encoding==="base64"&&asset.content?asset:await github("/repos/"+REPO+"/git/blobs/"+asset.sha,session.token);
+  if(payload.encoding!=="base64"||!payload.content)throw Error("Staged media blob unavailable");
+  const decoded=atob(payload.content.replace(/\s/g,""));
+  const bytes=Uint8Array.from(decoded,c=>c.charCodeAt(0));
+  if(bytes.length!==asset.size||!validMediaBytes(relative,bytes))throw Error("Invalid staged media content");
+  return {sha:asset.sha,bytes};
+}
 async function previewStagedImage(request,session){
   const relative=new URL(request.url).searchParams.get("path")||"";
   if(!STAGED_IMAGE_PATH.test(relative)&&!RESOURCE_REF.test(relative))return fail("Invalid staged media path",400);
   try{
-    const result=await github("/repos/"+REPO+"/contents/"+relative+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
-    if(result.type!=="file"||result.encoding!=="base64"||!result.content||result.size>(RESOURCE_REF.test(relative)?RESOURCE_MAX_BYTES:1572864))return fail("Media unavailable",404);
-    const decoded=atob(result.content.replace(/\s/g,""));
-    const bytes=Uint8Array.from(decoded,c=>c.charCodeAt(0));
-    if(!validMediaBytes(relative,bytes))return fail("Media format invalid",422);
-    return new Response(bytes,{headers:{"content-type":mediaMime(relative),"cache-control":"private, no-store","x-content-type-options":"nosniff","content-disposition":"inline"}});
-  }catch(_){return fail("Image unavailable",404)}
+    const media=await readStagedAsset(session,relative);
+    return new Response(media.bytes,{headers:{"content-type":mediaMime(relative),"cache-control":"private, no-store","x-content-type-options":"nosniff","content-disposition":"inline"}});
+  }catch(_){return fail("Staged media unavailable or invalid",404)}
 }
 
 
@@ -352,12 +361,7 @@ async function preparePublish(session,env){
   const staged=imageRefs(draft.data);
   if(staged.length>120)return fail("Too many media files to publish at once",422);
   for(const path of staged){
-    try{
-      const asset=await github("/repos/"+REPO+"/contents/"+path+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
-      if(asset.type!=="file"||!asset.sha||asset.encoding!=="base64"||!asset.content||asset.size>(RESOURCE_REF.test(path)?RESOURCE_MAX_BYTES:1572864))return fail("Invalid staged media: "+path,422);
-      const bytes=Uint8Array.from(atob(asset.content.replace(/\s/g,"")),c=>c.charCodeAt(0));
-      if(!validMediaBytes(path,bytes))return fail("Invalid staged media signature: "+path,422);
-    }catch(_){return fail("Missing uploaded photo on staging branch",422)}
+    try{await readStagedAsset(session,path)}catch(_){return fail("Staged file is unavailable or invalid: "+path,422)}
   }
   const differences=["about","profile","works","gallery","contact"].filter(k=>JSON.stringify(draft.data[k])!==JSON.stringify(live.data[k]));
   const id=random();
@@ -392,10 +396,8 @@ async function confirmPublish(request,session,env){
   const mainCommit=await github("/repos/"+REPO+"/git/commits/"+mainHead,session.token);
   const changes=[{path:CONTENT_PATH,mode:"100644",type:"blob",sha:draft.sha}];
   for(const path of refs){
-    const asset=await github("/repos/"+REPO+"/contents/"+path+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
-    if(asset.type!=="file"||!asset.sha||asset.encoding!=="base64"||!asset.content||asset.size>(RESOURCE_REF.test(path)?RESOURCE_MAX_BYTES:1572864))return fail("Staged media is missing or invalid",422);
-    const bytes=Uint8Array.from(atob(asset.content.replace(/\s/g,"")),c=>c.charCodeAt(0));
-    if(!validMediaBytes(path,bytes))return fail("Staged media has invalid file signature",422);
+    let asset;
+    try{asset=await readStagedAsset(session,path)}catch(_){return fail("Staged file is unavailable or invalid: "+path,422)}
     changes.push({path,mode:"100644",type:"blob",sha:asset.sha});
   }
   const tree=await github("/repos/"+REPO+"/git/trees",session.token,{
