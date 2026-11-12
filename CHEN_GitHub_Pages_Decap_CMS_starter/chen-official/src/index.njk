@@ -1,0 +1,136 @@
+---
+permalink: index.html
+---
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="{{ settings.site_description }}">
+  <meta property="og:title" content="{{ settings.site_title }}">
+  <meta property="og:description" content="{{ settings.site_description }}">
+  <link rel="canonical" href="{{ settings.canonical_url }}/">
+  <title>{{ settings.site_title }}</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/site.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="masthead wrap">
+    <a class="brand" href="#home" aria-label="CHEN. home">{{ settings.brand }}</a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="#about">ABOUT</a><a href="#filmography">FILMOGRAPHY</a><a href="#profile">PROFILE</a><a href="#gallery">GALLERY</a><a href="#contact">CONTACT</a>
+    </nav>
+    <div class="languages" aria-label="Site language">
+      <button type="button" data-lang="zh" aria-pressed="true">TW</button><span>/</span>
+      <button type="button" data-lang="en" aria-pressed="false">EN</button><span>/</span>
+      <button type="button" data-lang="ko" aria-pressed="false">KR</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section id="home" class="hero wrap">
+      <div class="hero-copy">
+        <span class="eyebrow">ACTOR — {{ about.based_in }}</span>
+        <h1>{{ about.name_zh }}</h1>
+        <p class="latin-name">{{ about.name_en }}</p>
+        <p class="korean-name">{{ about.name_ko }}</p>
+        <a class="quiet-link" href="#filmography"><span data-i18n="viewWork">VIEW WORK</span> <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="hero-visual{% if not about.hero_image %} hero-empty{% endif %}">
+        {% if about.hero_image %}<img src="{{ about.hero_image }}" alt="{{ about.name_en }} actor portrait" loading="eager">{% else %}<span class="visual-note" data-i18n="portraitPending">PORTRAIT TO BE ADDED</span>{% endif %}
+      </div>
+    </section>
+
+    <section id="about" class="section wrap">
+      <div class="section-head"><span class="section-index">01 /</span><h2>ABOUT</h2></div>
+      <div class="section-body about-grid">
+        <div><p class="section-lead" data-i18n="introLead">A profile in progress.</p><p class="body-copy" id="bio"></p></div>
+        <dl class="facts">
+          {% if about.show_birth_year %}<div><dt data-i18n="birthYear">BIRTH YEAR</dt><dd>{{ about.birth_year }}</dd></div>{% endif %}
+          <div><dt data-i18n="basedIn">BASED IN</dt><dd>{{ about.based_in }}</dd></div>
+          <div><dt data-i18n="languages">LANGUAGES</dt><dd>{{ about.languages | join(' / ') }}</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section id="filmography" class="section wrap">
+      <div class="section-head"><span class="section-index">02 /</span><h2>FILMOGRAPHY</h2></div>
+      <div class="section-body">
+        <div class="filter-bar" role="group" aria-label="Filter works">
+          <button class="filter active" type="button" data-filter="all">ALL</button>
+          <button class="filter" type="button" data-filter="Film">FILM</button>
+          <button class="filter" type="button" data-filter="Drama">DRAMA</button>
+          <button class="filter" type="button" data-filter="Commercial">COMMERCIAL</button>
+          <button class="filter" type="button" data-filter="Music Video">MUSIC VIDEO</button>
+          <button class="filter" type="button" data-filter="Modeling">MODELING</button>
+          <button class="filter" type="button" data-filter="Other">OTHER</button>
+        </div>
+        {% if works.length %}
+        <div class="works-grid" id="works-grid">
+          {% for work in works %}
+          <article class="work" data-category="{{ work.category }}" data-work='{{ work | json }}'>
+            <button class="work-open" type="button" aria-label="View work details">
+              <span class="work-thumb">{% if work.cover %}<img loading="lazy" src="{{ work.cover }}" alt="{{ work.title_zh or work.title }}">{% else %}<span class="image-placeholder">IMAGE</span>{% endif %}</span>
+              <span class="work-topline"><span>{{ work.category }}</span><span>{{ work.year }}</span></span>
+              <strong class="work-title">{{ work.title_zh or work.title }}</strong>
+              {% if work.role_zh or work.role %}<span class="work-role">{{ work.role_zh or work.role }}</span>{% endif %}
+            </button>
+          </article>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-note" data-i18n="noWorks">SELECTED WORKS WILL APPEAR HERE.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section id="profile" class="section wrap">
+      <div class="section-head"><span class="section-index">03 /</span><h2>PROFILE</h2></div>
+      <div class="section-body">
+        <div class="profile-list">
+          <div class="profile-item"><div><h3>MODEL CARD</h3><p data-i18n="modelCardHint">Preview and download in PDF format.</p></div>
+            {% if profile.model_card_pdf %}<div class="profile-actions"><button type="button" class="small-button" data-pdf="{{ profile.model_card_pdf }}" data-i18n="preview">PREVIEW</button><a class="small-button" href="{{ profile.model_card_pdf }}" target="_blank" rel="noopener" download data-i18n="download">DOWNLOAD PDF</a></div>{% else %}<span class="muted" data-i18n="comingSoon">COMING SOON</span>{% endif %}</div>
+          <div class="profile-item"><div><h3>ACTOR PROFILE</h3><p data-i18n="actorProfileHint">Full résumé in PDF format.</p></div>
+            {% if profile.actor_profile_pdf %}<div class="profile-actions"><button type="button" class="small-button" data-pdf="{{ profile.actor_profile_pdf }}" data-i18n="preview">PREVIEW</button><a class="small-button" href="{{ profile.actor_profile_pdf }}" target="_blank" rel="noopener" download data-i18n="download">DOWNLOAD PDF</a></div>{% else %}<span class="muted" data-i18n="comingSoon">COMING SOON</span>{% endif %}</div>
+          {% if profile.showreel_url %}<div class="profile-item"><div><h3>SHOWREEL</h3><p data-i18n="showreelHint">Selected performance clips.</p></div><a class="small-button" href="{{ profile.showreel_url }}" target="_blank" rel="noopener noreferrer" data-i18n="watch">WATCH ↗</a></div>{% endif %}
+        </div>
+      </div>
+    </section>
+
+    <section id="gallery" class="section wrap">
+      <div class="section-head"><span class="section-index">04 /</span><h2>GALLERY</h2></div>
+      <div class="section-body">
+        {% if gallery.photos.length %}<div class="gallery-grid">{% for photo in gallery.photos %}{% if photo.image %}<figure><img src="{{ photo.image }}" loading="lazy" alt="{{ photo.caption or 'Portrait' }}"><figcaption>{{ photo.caption }}</figcaption></figure>{% endif %}{% endfor %}</div>
+        {% else %}<p class="empty-note" data-i18n="noPhotos">SELECTED PHOTOGRAPHS WILL APPEAR HERE.</p>{% endif %}
+      </div>
+    </section>
+
+    <section id="contact" class="section wrap contact-section">
+      <div class="section-head"><span class="section-index">05 /</span><h2>CONTACT</h2></div>
+      <div class="section-body contact-grid">
+        <div><p class="section-lead" data-i18n="collaboration">FOR COLLABORATIONS & INQUIRIES</p>
+          <p class="muted" data-i18n="contactTypes">Acting · Commercial & Brand · Modeling · Management</p></div>
+        <div class="contact-links">
+          {% if contact.work_email %}<a href="mailto:{{ contact.work_email }}">{{ contact.work_email }} ↗</a>{% else %}<span class="muted" data-i18n="emailPending">WORK EMAIL TO BE ADDED</span>{% endif %}
+          {% if contact.instagram_url %}<a href="{{ contact.instagram_url }}" target="_blank" rel="noopener noreferrer">INSTAGRAM ↗</a>{% endif %}
+          {% if contact.other_social_url %}<a href="{{ contact.other_social_url }}" target="_blank" rel="noopener noreferrer">SOCIAL ↗</a>{% endif %}
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="wrap footer"><span>© {{ settings.brand }} {{ buildYear }}</span><span>ACTOR · TAIWAN</span><a href="#home">BACK TO TOP ↑</a></footer>
+
+  <dialog id="work-dialog" class="work-dialog" aria-label="Work details">
+    <button class="dialog-close" type="button" data-close aria-label="Close">×</button>
+    <div id="work-dialog-body"></div>
+  </dialog>
+  <dialog id="pdf-dialog" class="pdf-dialog" aria-label="PDF preview">
+    <div class="pdf-toolbar"><strong>PDF PREVIEW</strong><a id="pdf-external" href="#" target="_blank" rel="noopener" data-i18n="openPdf">OPEN PDF ↗</a><button type="button" data-close aria-label="Close">×</button></div>
+    <iframe id="pdf-frame" title="Model card / actor profile PDF"></iframe>
+    <p class="pdf-fallback" data-i18n="pdfFallback">If your device cannot display the PDF, use OPEN PDF.</p>
+  </dialog>
+  <script type="application/json" id="site-content">{{ {about: about} | json | safe }}</script>
+</body>
+</html>
