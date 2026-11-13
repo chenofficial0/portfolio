@@ -36,7 +36,7 @@ function walk(current,path,mapping){
    if(!PUBLIC_MEDIA.test(target.slice(PUBLIC_ORIGIN.length)))throw Error("INVALID_PUBLIC_MEDIA_DESTINATION");
    mapping.push({source:v,publicUrl:target,publicPath:target.slice(PUBLIC_ORIGIN.length),field:p});
    out[k]=target;
-  }else if(typeof v==="string"&&MEDIA_FIELDS.has(k)&&v.startsWith("assets/uploads/")){
+  }else if(typeof v==="string"&&isPublishablePrivateField(p)&&v.startsWith("assets/uploads/")){
    if(!PUBLIC_MEDIA.test(v))throw Error("INVALID_STAGED_PUBLIC_REFERENCE");
    out[k]=PUBLIC_ORIGIN+v;
   }else{
