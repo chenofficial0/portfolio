@@ -1,0 +1,36 @@
+name: CHEN Controlled Private KV Migration
+
+# This workflow does not run during ordinary pushes or pull requests.
+# Execute only after controlled write-token setup and explicit release approval.
+on:
+  push:
+    branches:
+      - feature/zero-cost-private-media
+    paths:
+      - "backend/TRIGGER_APPROVED_PRIVATE_KV_MIGRATION.md"
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-verified-snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout isolated development branch
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate exact source photos and migration bundle
+        run: |
+          node backend/private-kv-migration-bundle.test.mjs
+          node backend/migration-preflight.test.mjs
+          node --check backend/phase17-live-kv-migrate.mjs
+      - name: Write only two verified private media keys and an immutable root
+        env:
+          CLOUDFLARE_KV_MIGRATION_TOKEN: ${{ secrets.CLOUDFLARE_KV_MIGRATION_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CHEN_CONFIRM_MIGRATION: COPY_TWO_PHOTOS_AND_CREATE_ROOT
+        run: node backend/phase17-live-kv-migrate.mjs
