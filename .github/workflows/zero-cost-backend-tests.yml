@@ -64,3 +64,16 @@ jobs:
         run: ./backend/node_modules/.bin/playwright install chromium
       - name: Run desktop and mobile browser smoke tests
         run: node backend/phase16-browser-smoke.test.mjs
+
+  production-readonly-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify live public site and anonymous API without writes
+        run: node backend/phase18-live-readonly.test.mjs
