@@ -107,7 +107,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     <div class="side-foot"><a href="../" target="_blank" rel="noopener">查看正式網站 ↗</a><a href="./">開啟原有 Decap 後台 ↗</a></div>
   </aside>
   <main class="content">
-    <header class="topbar"><span class="overline">CHEN. / WEBSITE MANAGEMENT</span><div class="top-actions"><button class="btn" id="import">匯入 JSON</button><button class="btn" id="export">匯出修改檔案</button><button class="btn dark" id="publish" hidden>儲存草稿</button><button class="btn" id="preview-site" hidden>預覽網站</button><button class="btn" id="review-release" hidden>正式發布檢查</button><button class="btn" id="login" hidden>使用 GitHub 登入</button><button class="btn" id="logout" hidden>登出</button></div></header>
+    <header class="topbar"><span class="overline">CHEN. / WEBSITE MANAGEMENT</span><div class="top-actions"><button class="btn" id="import">匯入 JSON</button><button class="btn" id="export">匯出修改檔案</button><select id="private-revision-picker" aria-label="選擇私人草稿版本" hidden style="max-width:240px;padding:9px;border:1px solid #ddd"></select><button class="btn dark" id="publish" hidden>儲存草稿</button><button class="btn" id="preview-site" hidden>預覽網站</button><button class="btn" id="review-release" hidden>正式發布檢查</button><button class="btn" id="login" hidden>使用 GitHub 登入</button><button class="btn" id="logout" hidden>登出</button></div></header>
     <section class="hero"><div class="overline" id="page-tag">OVERVIEW</div><h1 id="page-title">網站管理總覽</h1><p id="page-description">管理 CHEN. 官方網站內容。這是客製化後台第一階段，可編輯資料並匯出 JSON；尚未連接安全發布服務。</p></section>
     <div class="notice" id="auth-notice" role="status"><strong>預覽模式。</strong> 目前未連接已部署的安全服務。可編輯並匯出 JSON；內容不會自動發布。請勿在此輸入密碼或 GitHub Token。</div>
     <section class="release-review" id="release-review-panel" hidden></section><div id="view"></div>
@@ -120,7 +120,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
   "use strict";
   const DATA_URL = new URL("https://raw.githubusercontent.com/chenofficial0/portfolio/main/content/site.json");
   const isWorkerHost = location.pathname==="/studio" && location.protocol==="https:";
-  let apiSession=null,contentSha=null;
+  let apiSession=null,contentSha=null,privateMode=false,privateRevisionId=null;
   const pages = {
     dashboard:["OVERVIEW","網站管理總覽","檢視目前內容完整度，選擇要編輯的網站區域。"],
     about:["ABOUT","個人介紹","修改中、英、韓姓名與簡介。"],
@@ -686,6 +686,57 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
   const previewButton=document.getElementById("preview-site"),reviewButton=document.getElementById("review-release");
   const reviewPanel=document.getElementById("release-review-panel");
   let approvedPlanId=null;
+  const privatePicker=document.getElementById("private-revision-picker");
+  async function privateFetch(url,options={}){
+    const response=await fetch(url,{credentials:"same-origin",cache:"no-store",...options});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(payload.error||"私人草稿請求失敗");
+    return payload;
+  }
+  async function refreshPrivateRevisions(selectedId=null){
+    const records=[];let cursor=null;
+    for(let page=0;page<10;page++){
+      const result=await privateFetch("/api/draft/revisions"+(cursor?"?cursor="+encodeURIComponent(cursor):""));
+      if(!Array.isArray(result.revisions))throw Error("版本清單格式不正確");
+      records.push(...result.revisions);
+      cursor=result.nextCursor;
+      if(!cursor)break;
+    }
+    if(cursor)throw Error("版本數量超過可驗證範圍，停止儲存");
+    privatePicker.replaceChildren();
+    const first=document.createElement("option");
+    first.value="";first.textContent="選擇私人草稿版本";privatePicker.append(first);
+    records.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+    for(const record of records){
+      if(!/^[A-Za-z0-9_-]{32,64}$/.test(record.id))throw Error("版本 ID 無效");
+      const option=document.createElement("option");
+      option.value=record.id;
+      option.textContent=String(record.createdAt||"未知時間")+" · "+record.id.slice(0,8);
+      privatePicker.append(option);
+    }
+    privatePicker.hidden=false;
+    privatePicker.value=selectedId&&records.some(x=>x.id===selectedId)?selectedId:"";
+    return records.length;
+  }
+  async function loadPrivateRevision(id){
+    if(!/^[A-Za-z0-9_-]{32,64}$/.test(id))throw Error("版本 ID 無效");
+    const result=await privateFetch("/api/draft/revision?id="+encodeURIComponent(id));
+    if(!result.immutable||!result.data)throw Error("無法確認私人草稿版本");
+    data=norm(result.data);privateRevisionId=id;contentSha=null;
+    changed=false;document.title="CHEN. | Content Studio";
+    publish.hidden=false;publish.disabled=false;
+    notice.textContent="已選擇私人草稿版本 "+id.slice(0,12)+"；儲存只會建立全新版本。";
+    renderMain();
+  }
+  privatePicker.addEventListener("change",async()=>{
+    if(changed&&!confirm("切換將捨棄尚未儲存的修改。確定切換嗎？")){
+      privatePicker.value=privateRevisionId||"";return;
+    }
+    const id=privatePicker.value;
+    if(!id){privateRevisionId=null;publish.hidden=true;return;}
+    try{await loadPrivateRevision(id)}
+    catch(err){privateRevisionId=null;publish.hidden=true;alert("無法載入私人版本："+err.message);}
+  });
   previewButton.addEventListener("click",()=>{
     if(changed && !confirm("有尚未儲存的編輯內容。預覽會顯示 GitHub 測試分支最後儲存的草稿，仍要開啟嗎？"))return;
     window.open("/preview","_blank","noopener,noreferrer");
@@ -758,11 +809,21 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
         const session=await response.json();
         if(session.authenticated){
           apiSession=session;
-          publish.hidden=!session.canSave;logout.hidden=false;previewButton.hidden=false;reviewButton.hidden=false;
+          privateMode=session.canUseImmutableStudio===true;
+          publish.hidden=!session.canSave&&!privateMode;
+          logout.hidden=false;previewButton.hidden=privateMode;reviewButton.hidden=privateMode;
           notice.textContent="已透過 GitHub 登入："+session.login+"。"+(session.canSave?"已開放儲存至 GitHub 測試分支。新上傳照片需要已設定私人儲存空間，否則後端會拒絕上傳。":"目前為安全測試模式：尚未開放儲存草稿。可編輯及匯出 JSON 備份。");
-          const contentResponse=await fetch("/api/content",{credentials:"same-origin",cache:"no-store"});
-          if(!contentResponse.ok)throw Error("無法讀取網站的最新資料");
-          const payload=await contentResponse.json();data=norm(payload.data);contentSha=payload.sha;
+          if(privateMode){
+            publish.hidden=true;
+            const count=await refreshPrivateRevisions();
+            notice.textContent=count
+              ?"請從右上方選擇要編輯的私人草稿版本；不會自動選擇最新版。"
+              :"私人草稿尚未安全遷移，目前禁止儲存。";
+          }else{
+            const contentResponse=await fetch("/api/content",{credentials:"same-origin",cache:"no-store"});
+            if(!contentResponse.ok)throw Error("無法讀取網站的最新資料");
+            const payload=await contentResponse.json();data=norm(payload.data);contentSha=payload.sha;
+          }
         }else{
           login.hidden=false;
           notice.textContent="尚未登入。可先以預覽模式編輯並匯出 JSON；只有授權的 GitHub 帳號可以發布。";
@@ -786,6 +847,26 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     changed=false;location.href="/studio";
   });
   publish.addEventListener("click",async()=>{
+    if(privateMode){
+      if(!apiSession?.canUseImmutableStudio||!privateRevisionId)
+        return alert("請先選擇已遷移的私人草稿版本");
+      if(!confirm("確定將修改另存全新私人草稿版本？原版本保留，正式網站不會更新。"))return;
+      publish.disabled=true;publish.textContent="另存新版本…";
+      try{
+        const result=await privateFetch("/api/draft/revision",{
+          method:"POST",headers:{"content-type":"application/json","x-chen-csrf":apiSession.csrf},
+          body:JSON.stringify({parentId:privateRevisionId,data})
+        });
+        if(!/^[A-Za-z0-9_-]{32,64}$/.test(result.id))throw Error("無法驗證新版本 ID");
+        privateRevisionId=result.id;
+        changed=false;document.title="CHEN. | Content Studio";
+        await refreshPrivateRevisions(result.id);
+        notice.textContent="新的私人草稿版本已儲存 "+result.id.slice(0,12)+"。正式網站未更新。";
+      }catch(err){
+        alert("儲存狀態不明："+err.message+"。請先匯出 JSON，再檢查歷史版本，避免重複送出。");
+      }finally{publish.disabled=false;publish.textContent="另存私人草稿";}
+      return;
+    }
     if(!apiSession?.canSave||!contentSha)return alert("目前尚未開放儲存草稿");
     if(!confirm("確定要將目前資料儲存至 GitHub 測試分支？不會更新正式網站。"))return;
     publish.disabled=true;publish.textContent="儲存中…";
