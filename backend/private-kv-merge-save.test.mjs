@@ -34,7 +34,20 @@ assert.equal(out.ok,true);
 assert.equal(out.originalRevisionsPreserved,true);
 assert.equal(out.published,false);
 assert.equal(out.revision.parentId,root.id);
-assert.equal(blobs.size,count+1);
+assert.equal(blobs.size,count+2);
+const repeated=await saveReviewedMerge(env,{
+  ...input,previewDigest:preview.digest,confirmation:"SAVE_MERGE_AS_NEW_REVISION"
+},validate);
+assert.equal(repeated.alreadySaved,true);
+assert.equal(repeated.revision.id,out.revision.id);
+assert.equal(blobs.size,count+2);
+const receiptKey="merge-receipt-v1/"+preview.digest;
+const validReceipt=blobs.get(receiptKey);
+blobs.set(receiptKey,"invalid JSON");
+await assert.rejects(saveReviewedMerge(env,{
+  ...input,previewDigest:preview.digest,confirmation:"SAVE_MERGE_AS_NEW_REVISION"
+},validate),/MERGE_RECEIPT_CORRUPT/);
+blobs.set(receiptKey,validReceipt);
 const saved=await readRevision(env,out.revision.id,{validate});
 assert.equal(saved.data.about.name,"Desktop");
 assert.deepEqual(saved.mergeSources,{left:left.id,right:right.id});
