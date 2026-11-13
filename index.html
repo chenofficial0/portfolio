@@ -106,6 +106,13 @@
 .gallery-photo-info [hidden]{display:none!important}
 @media(max-width:700px){.gallery-photo-dialog{width:calc(100% - 22px);max-height:90dvh}.gallery-photo-stage{padding:0 12px}.gallery-photo-stage img{max-height:58dvh}.gallery-photo-info{padding:18px 18px 23px}}
 .cms-social-link{font-size:12px;overflow-wrap:anywhere}
+.contact-email-block{display:flex;flex-direction:column;align-items:flex-start;gap:11px}
+.contact-email-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.contact-email-action{border:1px solid #dedede;background:#fff;color:#222;padding:8px 13px;font-size:11px;line-height:1.4;letter-spacing:.03em;cursor:pointer;min-height:36px}
+.contact-email-action:hover{background:#f7f7f7}
+.contact-email-feedback{font-size:11px;color:#666;margin:0}
+.contact-email-feedback[hidden]{display:none!important}
+@media(max-width:700px){.contact-email-actions{gap:8px}.contact-email-action{min-height:42px;padding:10px 12px}}
 .cms-meta-note{font-size:10px;color:var(--dim);margin-top:8px}
 @media(max-width:700px){.cms-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}}
 .quiet-link .link-arrow{margin-left:12px}
@@ -344,9 +351,9 @@
 (() => {
   'use strict';
   const strings = {
-    zh: {saveImage:'儲存圖片',profileBasic:'基本資料',profileAppearance:'外型資料',profileProfessional:'專業資訊',profilePhotoPending:'演員形象照待補',profileLocation:'所在地',profileLanguages:'語言',profileLanguagesValue:'中文 / English / 한국어',profileWeight:'體重',profileBust:'胸圍',profileWaist:'腰圍',profileHips:'臀圍',profileShoe:'鞋碼',profileHair:'髮色',profileEyes:'瞳色',profileAgency:'經紀公司',profileHeight:'身高',profileSkills:'專長',toAdd:'待補充',modelCardAction:'模特卡',resumeAction:'演員履歷',showreelAction:'表演影片',profileLinksPending:'正式檔案與影片連結上傳後開放',viewWork:'查看作品',portraitPending:'形象照片待補',introLead:'演員資料',birthYear:'出生年份',basedIn:'所屬地區',languages:'語言能力',noWorks:'作品資料準備中',modelCardHint:'線上預覽與 PDF 下載',actorProfileHint:'演員履歷 PDF',preview:'預覽',download:'下載 PDF',comingSoon:'資料準備中',showreelHint:'演出片段',watch:'觀看',noPhotos:'攝影作品準備中',collaboration:'合作邀約',contactTypes:'演出邀約 · 廣告與品牌合作 · 平面模特合作 · 經紀及商務聯繫',emailPending:'工作信箱待補',openPdf:'另開 PDF',pdfFallback:'若裝置無法直接顯示 PDF，請選擇「另開 PDF」。',production:'製作公司／品牌',role:'擔任角色',year:'年份',type:'演出類型',video:'觀看影片',close:'關閉'},
-    en: {saveImage:'Save Image',profileBasic:'BASIC',profileAppearance:'APPEARANCE',profileProfessional:'PROFESSIONAL',profilePhotoPending:'PORTRAIT TO BE ADDED',profileLocation:'BASED IN',profileLanguages:'LANGUAGES',profileLanguagesValue:'Mandarin / English / Korean',profileWeight:'WEIGHT',profileBust:'BUST',profileWaist:'WAIST',profileHips:'HIPS',profileShoe:'SHOE SIZE',profileHair:'HAIR COLOR',profileEyes:'EYE COLOR',profileAgency:'AGENCY',profileHeight:'HEIGHT',profileSkills:'SKILLS',toAdd:'TO BE ADDED',modelCardAction:'MODEL CARD',resumeAction:'ARTIST RÉSUMÉ',showreelAction:'SHOWREEL',profileLinksPending:'Links will be available when files are added.',viewWork:'VIEW WORK',portraitPending:'PORTRAIT TO BE ADDED',introLead:'Artist profile',birthYear:'BIRTH YEAR',basedIn:'BASED IN',languages:'LANGUAGES',noWorks:'SELECTED WORKS WILL APPEAR HERE.',modelCardHint:'Preview online and download PDF.',actorProfileHint:'Artist résumé in PDF format.',preview:'PREVIEW',download:'DOWNLOAD PDF',comingSoon:'COMING SOON',showreelHint:'Selected performance clips.',watch:'WATCH',noPhotos:'SELECTED PHOTOGRAPHS WILL APPEAR HERE.',collaboration:'FOR COLLABORATIONS & INQUIRIES',contactTypes:'Acting · Commercial & Brand · Modeling · Management',emailPending:'WORK EMAIL TO BE ADDED',openPdf:'OPEN PDF',pdfFallback:'If your device cannot display the PDF, use OPEN PDF.',production:'Production / Brand',role:'Role',year:'Year',type:'Category',video:'WATCH VIDEO',close:'Close'},
-    ko: {saveImage:'이미지 저장',profileBasic:'기본 정보',profileAppearance:'외형 정보',profileProfessional:'활동 정보',profilePhotoPending:'프로필 사진 준비 중',profileLocation:'활동 지역',profileLanguages:'언어',profileLanguagesValue:'중국어 / 영어 / 한국어',profileWeight:'몸무게',profileBust:'가슴둘레',profileWaist:'허리둘레',profileHips:'엉덩이둘레',profileShoe:'신발 사이즈',profileHair:'머리색',profileEyes:'눈동자 색',profileAgency:'소속사',profileHeight:'키',profileSkills:'특기',toAdd:'추후 업데이트',modelCardAction:'모델 카드',resumeAction:'배우 이력서',showreelAction:'연기 영상',profileLinksPending:'파일과 영상 링크가 등록되면 열람할 수 있습니다.',viewWork:'작품 보기',portraitPending:'프로필 사진 준비 중',introLead:'배우 프로필',birthYear:'출생 연도',basedIn:'활동 지역',languages:'언어',noWorks:'작품 정보 준비 중',modelCardHint:'온라인 미리보기 및 PDF 다운로드',actorProfileHint:'배우 이력서 PDF',preview:'미리보기',download:'PDF 다운로드',comingSoon:'준비 중',showreelHint:'연기 영상',watch:'영상 보기',noPhotos:'갤러리 준비 중',collaboration:'캐스팅 및 협업 문의',contactTypes:'출연 · 광고 및 브랜드 · 모델 · 매니지먼트',emailPending:'업무용 이메일 준비 중',openPdf:'PDF 열기',pdfFallback:'PDF가 표시되지 않으면 「PDF 열기」를 이용해 주세요.',production:'제작사 / 브랜드',role:'배역',year:'연도',type:'유형',video:'영상 보기',close:'닫기'}
+    zh: {saveImage:'儲存圖片',profileBasic:'基本資料',profileAppearance:'外型資料',profileProfessional:'專業資訊',profilePhotoPending:'演員形象照待補',profileLocation:'所在地',profileLanguages:'語言',profileLanguagesValue:'中文 / English / 한국어',profileWeight:'體重',profileBust:'胸圍',profileWaist:'腰圍',profileHips:'臀圍',profileShoe:'鞋碼',profileHair:'髮色',profileEyes:'瞳色',profileAgency:'經紀公司',profileHeight:'身高',profileSkills:'專長',toAdd:'待補充',modelCardAction:'模特卡',resumeAction:'演員履歷',showreelAction:'表演影片',profileLinksPending:'正式檔案與影片連結上傳後開放',viewWork:'查看作品',portraitPending:'形象照片待補',introLead:'演員資料',birthYear:'出生年份',basedIn:'所屬地區',languages:'語言能力',noWorks:'作品資料準備中',modelCardHint:'線上預覽與 PDF 下載',actorProfileHint:'演員履歷 PDF',preview:'預覽',download:'下載 PDF',comingSoon:'資料準備中',showreelHint:'演出片段',watch:'觀看',noPhotos:'攝影作品準備中',collaboration:'合作邀約',contactTypes:'演出邀約 · 廣告與品牌合作 · 平面模特合作 · 經紀及商務聯繫',emailPending:'工作信箱待補',sendEmail:'寄送郵件',copyEmail:'複製信箱',copiedEmail:'已複製電子郵件地址',copyEmailFailed:'無法自動複製，請手動選取上方信箱地址',openPdf:'另開 PDF',pdfFallback:'若裝置無法直接顯示 PDF，請選擇「另開 PDF」。',production:'製作公司／品牌',role:'擔任角色',year:'年份',type:'演出類型',video:'觀看影片',close:'關閉'},
+    en: {saveImage:'Save Image',profileBasic:'BASIC',profileAppearance:'APPEARANCE',profileProfessional:'PROFESSIONAL',profilePhotoPending:'PORTRAIT TO BE ADDED',profileLocation:'BASED IN',profileLanguages:'LANGUAGES',profileLanguagesValue:'Mandarin / English / Korean',profileWeight:'WEIGHT',profileBust:'BUST',profileWaist:'WAIST',profileHips:'HIPS',profileShoe:'SHOE SIZE',profileHair:'HAIR COLOR',profileEyes:'EYE COLOR',profileAgency:'AGENCY',profileHeight:'HEIGHT',profileSkills:'SKILLS',toAdd:'TO BE ADDED',modelCardAction:'MODEL CARD',resumeAction:'ARTIST RÉSUMÉ',showreelAction:'SHOWREEL',profileLinksPending:'Links will be available when files are added.',viewWork:'VIEW WORK',portraitPending:'PORTRAIT TO BE ADDED',introLead:'Artist profile',birthYear:'BIRTH YEAR',basedIn:'BASED IN',languages:'LANGUAGES',noWorks:'SELECTED WORKS WILL APPEAR HERE.',modelCardHint:'Preview online and download PDF.',actorProfileHint:'Artist résumé in PDF format.',preview:'PREVIEW',download:'DOWNLOAD PDF',comingSoon:'COMING SOON',showreelHint:'Selected performance clips.',watch:'WATCH',noPhotos:'SELECTED PHOTOGRAPHS WILL APPEAR HERE.',collaboration:'FOR COLLABORATIONS & INQUIRIES',contactTypes:'Acting · Commercial & Brand · Modeling · Management',emailPending:'WORK EMAIL TO BE ADDED',sendEmail:'SEND EMAIL',copyEmail:'COPY EMAIL',copiedEmail:'Email address copied',copyEmailFailed:'Copy unavailable. Please select the email address above.',openPdf:'OPEN PDF',pdfFallback:'If your device cannot display the PDF, use OPEN PDF.',production:'Production / Brand',role:'Role',year:'Year',type:'Category',video:'WATCH VIDEO',close:'Close'},
+    ko: {saveImage:'이미지 저장',profileBasic:'기본 정보',profileAppearance:'외형 정보',profileProfessional:'활동 정보',profilePhotoPending:'프로필 사진 준비 중',profileLocation:'활동 지역',profileLanguages:'언어',profileLanguagesValue:'중국어 / 영어 / 한국어',profileWeight:'몸무게',profileBust:'가슴둘레',profileWaist:'허리둘레',profileHips:'엉덩이둘레',profileShoe:'신발 사이즈',profileHair:'머리색',profileEyes:'눈동자 색',profileAgency:'소속사',profileHeight:'키',profileSkills:'특기',toAdd:'추후 업데이트',modelCardAction:'모델 카드',resumeAction:'배우 이력서',showreelAction:'연기 영상',profileLinksPending:'파일과 영상 링크가 등록되면 열람할 수 있습니다.',viewWork:'작품 보기',portraitPending:'프로필 사진 준비 중',introLead:'배우 프로필',birthYear:'출생 연도',basedIn:'활동 지역',languages:'언어',noWorks:'작품 정보 준비 중',modelCardHint:'온라인 미리보기 및 PDF 다운로드',actorProfileHint:'배우 이력서 PDF',preview:'미리보기',download:'PDF 다운로드',comingSoon:'준비 중',showreelHint:'연기 영상',watch:'영상 보기',noPhotos:'갤러리 준비 중',collaboration:'캐스팅 및 협업 문의',contactTypes:'출연 · 광고 및 브랜드 · 모델 · 매니지먼트',emailPending:'업무용 이메일 준비 중',sendEmail:'이메일 보내기',copyEmail:'이메일 복사',copiedEmail:'이메일 주소가 복사되었습니다',copyEmailFailed:'복사할 수 없습니다. 위 이메일 주소를 직접 선택해 주세요.',openPdf:'PDF 열기',pdfFallback:'PDF가 표시되지 않으면 「PDF 열기」를 이용해 주세요.',production:'제작사 / 브랜드',role:'배역',year:'연도',type:'유형',video:'영상 보기',close:'닫기'}
   };
   let cmsData = null;
   let content = {};
@@ -817,7 +824,41 @@
     if(contacts){
       contacts.replaceChildren();
       if(c.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)){
-        const email=el('a','cms-social-link',c.email);email.href='mailto:'+c.email;contacts.append(email);
+        const emailBlock=el('div','contact-email-block');
+        const email=el('span','cms-social-link',c.email);
+        const actions=el('div','contact-email-actions');
+        const send=el('a','contact-email-action',i18n('sendEmail'));
+        send.href='mailto:'+c.email;
+        const copy=el('button','contact-email-action',i18n('copyEmail'));
+        copy.type='button';
+        const feedback=el('p','contact-email-feedback');
+        feedback.setAttribute('role','status');
+        feedback.setAttribute('aria-live','polite');
+        feedback.hidden=true;
+        copy.addEventListener('click',async()=>{
+          let copied=false;
+          try{
+            if(navigator.clipboard && window.isSecureContext){
+              await navigator.clipboard.writeText(c.email);
+              copied=true;
+            }
+          }catch(_){}
+          if(!copied){
+            const field=document.createElement('textarea');
+            field.value=c.email;
+            field.setAttribute('readonly','');
+            field.style.cssText='position:fixed;opacity:0;left:-9999px;top:0';
+            document.body.append(field);
+            field.focus();field.select();
+            try{copied=document.execCommand('copy')}catch(_){}
+            field.remove();
+          }
+          feedback.textContent=i18n(copied?'copiedEmail':'copyEmailFailed');
+          feedback.hidden=false;
+        });
+        actions.append(send,copy);
+        emailBlock.append(email,actions,feedback);
+        contacts.append(emailBlock);
       }else contacts.append(el('span','muted',i18n('emailPending')));
       for(const [label,url] of [['Instagram',c.instagram],['Social',c.other_url]]){
         if(safeFile(url)){const link=setArrowLabel(el('a','cms-social-link'),label);link.href=url;link.target='_blank';link.rel='noopener noreferrer';contacts.append(link)}
