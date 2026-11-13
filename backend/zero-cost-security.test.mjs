@@ -164,6 +164,16 @@ assert.deepEqual((await (await request(revisionUrl(mobileId))).json()).data,mobi
 assert.deepEqual((await (await request(revisionUrl(rootRevision.id))).json()).data,validDraft);
 assert.equal((await worker.fetch(new Request(origin+revisionUrl(rootRevision.id)),env)).status,401);
 env.ENABLE_REVISION_COMPARISON="true";
+// The private comparison UI is protected by the same login and feature flags.
+const comparisonPage=await request("/studio/revisions");
+assert.equal(comparisonPage.status,200);
+assert.match(comparisonPage.headers.get("content-type"),/text\/html/);
+assert.equal(comparisonPage.headers.get("cache-control"),"private, no-store");
+assert.match(comparisonPage.headers.get("content-security-policy"),/script-src 'nonce-/);
+const renderedPage=await comparisonPage.text();
+assert.match(renderedPage,/草稿版本比較/);
+assert.match(renderedPage,/api\/draft\/compare/);
+assert.equal((await worker.fetch(new Request(origin+"/studio/revisions"),env)).status,401);
 const comparePath="/api/draft/compare?base="+rootRevision.id+"&left="+desktopId+"&right="+mobileId;
 const threeWayResponse=await request(comparePath);
 assert.equal(threeWayResponse.status,200);
@@ -176,6 +186,7 @@ assert.equal((await request("/api/draft/compare?base=bad&left=bad&right=bad")).s
 assert.equal((await worker.fetch(new Request(origin+comparePath),env)).status,401);
 assert.equal((await request("/api/draft/compare?base="+desktopId+"&left="+rootRevision.id+"&right="+mobileId)).status,409);
 delete env.ENABLE_REVISION_COMPARISON;
+assert.equal((await request("/studio/revisions")).status,403);
 assert.equal((await request(comparePath)).status,403);
 delete env.ENABLE_IMMUTABLE_DRAFTS;
 delete env.PRIVATE_DRAFT_KV;
