@@ -6,6 +6,7 @@
  */
 import {validPrivateRef,validatePrivateMedia,storePrivateMedia,readPrivateMedia,deletePrivateMedia,privateKv} from "./private-kv-media.js";
 import {readPrivateDraft,writePrivateDraft} from "./private-kv-draft.js";
+import {appendRevision,readRevision,validRevisionId} from "./private-kv-revisions.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -220,6 +221,35 @@ async function saveContent(request,session,env){
   }catch(e){return fail([409,422].includes(e.http)?"Website content may have changed; reload before publishing":"GitHub publish failed",[409,422].includes(e.http)?409:502)}
 }
 
+// Independent immutable revision endpoints. Opt-in only; no mutable draft save replacement.
+async function getImmutableDraftRevision(request,env){
+  if(env.ENABLE_IMMUTABLE_DRAFTS!=="true")return fail("Immutable draft history is not enabled",403);
+  const id=new URL(request.url).searchParams.get("id");
+  if(!validRevisionId(id))return fail("Invalid revision identifier",400);
+  try{
+    const revision=await readRevision(env,id,{validate});
+    return revision?json({data:revision.data,sha:revision.id,parentId:revision.parentId,
+      createdAt:revision.createdAt,immutable:true}):fail("Revision is unavailable",404);
+  }catch(_){return fail("Private revision storage unavailable",503)}
+}
+async function appendImmutableDraftRevision(request,session,env){
+  if(env.ENABLE_IMMUTABLE_DRAFTS!=="true"||env.ENABLE_DRAFT_SAVES!=="true")
+    return fail("Immutable draft saves are not enabled",403);
+  if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
+  if(Number(request.headers.get("content-length")||0)>262144)return fail("Revision payload too large",413);
+  const raw=await request.text();
+  if(raw.length>262144)return fail("Revision payload too large",413);
+  let input;try{input=JSON.parse(raw)}catch(_){return fail("Invalid revision request",400)}
+  if(!input||!validate(input.data)||(input.parentId!==null&&!validRevisionId(input.parentId)))
+    return fail("Invalid revision content or parent",422);
+  try{return json(await appendRevision(env,{data:input.data,parentId:input.parentId,validate}),201)}
+  catch(err){
+    if(err.message==="REVISION_INVALID"||err.message==="INVALID_PARENT_REVISION")return fail("Invalid draft revision",422);
+    if(err.message==="REVISION_TOO_LARGE")return fail("Draft exceeds storage limit",413);
+    if(err.message==="PARENT_REVISION_UNAVAILABLE")return fail("Parent revision is unavailable; no data saved",409);
+    return fail("Private revision storage unavailable",503);
+  }
+}
 // New media stays in a private R2 bucket; absent binding must fail closed.
 const PRIVATE_MEDIA_REF=/^private-media\/chen-(?:hero|profile|gallery|work-cover|work-still|resource)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.(?:jpg|png|pdf)$/;
 const privateBucket=env=>env.PRIVATE_MEDIA&&typeof env.PRIVATE_MEDIA.put==="function"&&typeof env.PRIVATE_MEDIA.get==="function"?env.PRIVATE_MEDIA:null;
@@ -619,6 +649,11 @@ export default {
       if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_LIVE_PUBLISH==="true",canSave:env.ENABLE_DRAFT_SAVES==="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true"}:{authenticated:false,canPublish:false,canSave:false,canUpload:false});
       if(!s)return fail("Sign in with approved GitHub account",401);
       if(method==="GET"&&path==="/api/content")return getContent(s,env);
+      if(method==="GET"&&path==="/api/draft/revision")return getImmutableDraftRevision(request,env);
+      if(method==="POST"&&path==="/api/draft/revision"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return appendImmutableDraftRevision(request,s,env);
+      }
       if(method==="GET"&&path==="/preview")return previewSite();
       if(method==="GET"&&path==="/api/preview-content")return previewContent(s,env);
       if(method==="GET"&&path==="/api/publish/plan")return preparePublish(s,env);
