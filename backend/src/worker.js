@@ -5,6 +5,7 @@
  * and setting Cloudflare Worker secrets documented in README.
  */
 import {validPrivateRef,validatePrivateMedia,storePrivateMedia,readPrivateMedia,deletePrivateMedia,privateKv} from "./private-kv-media.js";
+import {readPrivateDraft,writePrivateDraft} from "./private-kv-draft.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -168,7 +169,15 @@ async function callback(request,env){
   r.headers.set("Cache-Control","no-store");
   return r;
 }
-async function getContent(session){
+async function getContent(session,env){
+  if(env.ENABLE_PRIVATE_DRAFTS==="true"){
+    try{
+      const draft=await readPrivateDraft(env);
+      if(!draft)return fail("Private draft has not been migrated; no public fallback",503);
+      if(!validate(draft.data))return fail("Private draft validation failed",503);
+      return json(draft);
+    }catch(_){return fail("Private draft storage unavailable",503)}
+  }
   const raw=await github("/repos/"+REPO+"/contents/"+CONTENT_PATH+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
   if(!raw.content||!raw.sha)return fail("Missing website content",502);
   const text=new TextDecoder().decode(Uint8Array.from(atob(raw.content.replace(/\s/g,"")),c=>c.charCodeAt(0)));
@@ -187,6 +196,17 @@ async function saveContent(request,session,env){
   if(Array.isArray(input.data.about.hero_images)){
     delete input.data.about.hero_image;
     delete input.data.about.hero_image_secondary;
+  }
+  if(env.ENABLE_PRIVATE_DRAFTS==="true"){
+    try{
+      const result=await writePrivateDraft(env,{data:input.data,expectedSha:input.sha,validate});
+      return json(result);
+    }catch(err){
+      if(err.message==="PRIVATE_DRAFT_STALE")return fail("Private draft changed; reload before saving",409);
+      if(err.message==="PRIVATE_DRAFT_TOO_LARGE")return fail("Private draft too large",413);
+      if(err.message==="PRIVATE_DRAFT_INVALID")return fail("Invalid private draft",422);
+      return fail("Private draft storage unavailable; no GitHub fallback",503);
+    }
   }
   const encoded=b64(utf8.encode(JSON.stringify(input.data,null,2)+"\n"));
   try{
@@ -334,7 +354,7 @@ async function deletePrivateKvAsset(request,editor,env){
   // The existing public draft source remains in use until private draft migration is accepted.
   // Fail closed if content cannot be loaded or any text field still refers to this media.
   let draft;
-  try{draft=await rawContent(editor,CONTENT_BRANCH)}catch(_){return fail("Unable to verify draft references",503)}
+  try{draft=env.ENABLE_PRIVATE_DRAFTS==="true"?await readPrivateDraft(env):await rawContent(editor,CONTENT_BRANCH)}catch(_){return fail("Unable to verify draft references",503)}
   if(!draft||!validate(draft.data))return fail("Unable to validate current draft",503);
   if(JSON.stringify(draft.data).includes(input.path))
     return fail("Photo is still referenced by a draft; remove its reference and save first",409);
@@ -417,8 +437,11 @@ async function getGitHead(session,branch){
   const ref=await github("/repos/"+REPO+"/git/ref/heads/"+encodeURIComponent(branch).replace(/%2F/gi,"/"),session.token);
   return ref.object.sha;
 }
-async function previewContent(session){
-  const draft=await rawContent(session,CONTENT_BRANCH);
+async function previewContent(session,env){
+  let draft;
+  if(env.ENABLE_PRIVATE_DRAFTS==="true"){
+    try{draft=await readPrivateDraft(env)}catch(_){return fail("Private draft storage unavailable",503)}
+  }else draft=await rawContent(session,CONTENT_BRANCH);
   if(!draft||!validate(draft.data))return fail("Draft data is unavailable or invalid",422);
   const data=JSON.parse(JSON.stringify(draft.data));
   const rewrite=value=>{
@@ -465,6 +488,7 @@ async function previewSite(){
   }});
 }
 async function preparePublish(session,env){
+  if(env.ENABLE_PRIVATE_DRAFTS==="true")return fail("Publishing private drafts is locked pending migration review",403);
   const [draft,live,stagingHead,mainHead]=await Promise.all([
     rawContent(session,CONTENT_BRANCH),rawContent(session,"main"),
     getGitHead(session,CONTENT_BRANCH),getGitHead(session,"main")
@@ -489,6 +513,7 @@ async function preparePublish(session,env){
     note:"Published files will be public. Review all photos and personal details before confirmation."});
 }
 async function confirmPublish(request,session,env){
+  if(env.ENABLE_PRIVATE_DRAFTS==="true")return fail("Private draft publishing is not enabled",403);
   if(env.ENABLE_LIVE_PUBLISH!=="true")return fail("Live publishing has not been approved or enabled",403);
   if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
   const raw=await request.text();
@@ -593,9 +618,9 @@ export default {
       const s=await session(request,env);
       if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_LIVE_PUBLISH==="true",canSave:env.ENABLE_DRAFT_SAVES==="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true"}:{authenticated:false,canPublish:false,canSave:false,canUpload:false});
       if(!s)return fail("Sign in with approved GitHub account",401);
-      if(method==="GET"&&path==="/api/content")return getContent(s);
+      if(method==="GET"&&path==="/api/content")return getContent(s,env);
       if(method==="GET"&&path==="/preview")return previewSite();
-      if(method==="GET"&&path==="/api/preview-content")return previewContent(s);
+      if(method==="GET"&&path==="/api/preview-content")return previewContent(s,env);
       if(method==="GET"&&path==="/api/publish/plan")return preparePublish(s,env);
       if(method==="POST"&&path==="/api/publish/confirm"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
