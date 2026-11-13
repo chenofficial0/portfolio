@@ -107,3 +107,11 @@ Cloudflare Workers KV Free: 1 GB total storage/account, 25 MiB maximum value, 10
 - Added `backend/private-kv-revision-list.test.mjs` and authenticated Worker-level listing checks. CI workflow now runs them.
 - **No changes to deployed studio, no feature enablement, no migration, no merge/publish or media deletion.** There is no on-site link to this experimental page.
 - This is still a prototype: version list correctness under live KV replication, UI browser behavior and storage-budget/performance require acceptance tests. Do NOT enable for active use until reviewed.
+
+## Manual conflict-resolution preview (isolated branch)
+- Added pure `backend/src/private-kv-merge-preview.js`: three-way change classification, explicit selection required for **every** conflict, atomic array/filmography/photo choice, output validation and preservation of source revisions. It does not write to any storage.
+- Added opt-in `POST /api/draft/merge-preview` with authentication, same-origin/CSRF, payload-size limits and direct-sibling revision relationship checks; the response contains a **preview only** (`persisted:false`, `published:false`). No merge-save endpoint is provided.
+- Enhanced `/studio/revisions`: per-conflict A/B radio choices, disabled preview button until all conflicts resolved, expanded merged JSON preview. Changing versions invalidates previous decisions.
+- Added standalone and Worker-level tests for choices, unresolved conflicts, rejection of unknown fields, array/photo resolution, missing CSRF, and no storage changes.
+- Existing `ENABLE_IMMUTABLE_DRAFTS` and `ENABLE_REVISION_COMPARISON` remain false on the isolated branch; no production deployment or automatic migration.
+- Remaining: proper accessible revision review, browser QA, explicit merge-as-new-revision workflow, controlled retention/backup and data migration. Never automatically publish preview output.
