@@ -74,6 +74,7 @@ function safeString(value,length=4000){return typeof value==="string"&&value.len
 function validURL(value){
   if(!value)return true;
   if(!safeString(value,2048))return false;
+  if(value.startsWith("private-media/"))return PRIVATE_MEDIA_REF.test(value);
   if(value.startsWith("/portfolio/assets/uploads/")||value.startsWith("assets/uploads/"))return !value.includes("..");
   try{const u=new URL(value);return u.protocol==="https:"&&!u.username&&!u.password}catch(_){return false}
 }
@@ -197,6 +198,10 @@ async function saveContent(request,session,env){
   }catch(e){return fail([409,422].includes(e.http)?"Website content may have changed; reload before publishing":"GitHub publish failed",[409,422].includes(e.http)?409:502)}
 }
 
+// New media stays in a private R2 bucket; absent binding must fail closed.
+const PRIVATE_MEDIA_REF=/^private-media\/chen-(?:hero|profile|gallery|work-cover|work-still|resource)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.(?:jpg|png|pdf)$/;
+const privateBucket=env=>env.PRIVATE_MEDIA&&typeof env.PRIVATE_MEDIA.put==="function"&&typeof env.PRIVATE_MEDIA.get==="function"?env.PRIVATE_MEDIA:null;
+const publicMediaPath=path=>path.replace(/^private-media\//,"assets/uploads/");
 const VALID_UPLOAD_SCOPES=new Set(["hero","profile","gallery","work-cover","work-still"]);
 function validatedJpeg(payload){
   if(!payload || typeof payload!=="object" || !VALID_UPLOAD_SCOPES.has(payload.scope) || payload.mime!=="image/jpeg" || typeof payload.base64!=="string")return null;
@@ -213,6 +218,8 @@ function validatedJpeg(payload){
 async function uploadImage(request,session,env){
   // This permission is separate from content publishing and defaults to disabled.
   if(env.ENABLE_MEDIA_UPLOADS!=="true")return fail("Photo upload is disabled until reviewed",403);
+  const bucket=privateBucket(env);
+  if(!bucket)return fail("Private media storage is not configured",503);
   if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
   const size=Number(request.headers.get("content-length")||0);
   if(size>2200000)return fail("Upload too large",413);
@@ -221,16 +228,12 @@ async function uploadImage(request,session,env){
   let parsed;try{parsed=JSON.parse(raw)}catch(_){return fail("Invalid upload JSON")}
   const photo=validatedJpeg(parsed);
   if(!photo)return fail("Only small JPEG photos are supported",422);
-  const path="assets/uploads/chen-"+photo.scope+"-"+new Date().toISOString().slice(0,10)+"-"+random().slice(0,16)+".jpg";
+  const path="private-media/chen-"+photo.scope+"-"+new Date().toISOString().slice(0,10)+"-"+random().slice(0,16)+".jpg";
   try{
-    const result=await github("/repos/"+REPO+"/contents/"+path,session.token,{
-      method:"PUT",
-      headers:{"content-type":"application/json"},
-      body:JSON.stringify({message:"Stage CHEN. photo for review",content:photo.base64,branch:CONTENT_BRANCH})
-    });
-    return json({ok:true,path,url:"https://chenofficial0.github.io/portfolio/"+path,
-      staging:true,commit:result.commit?.sha||null});
-  }catch(err){return fail("Unable to stage image to GitHub",err.http===403?403:502)}
+    const bytes=Uint8Array.from(atob(photo.base64),c=>c.charCodeAt(0));
+    await bucket.put(path,bytes,{httpMetadata:{contentType:"image/jpeg"}});
+    return json({ok:true,path,url:path,staging:true,private:true});
+  }catch(_){return fail("Private media upload failed",502)}
 }
 
 
@@ -238,7 +241,7 @@ const RESOURCE_REF=/^assets\/uploads\/chen-resource-\d{4}-\d{2}-\d{2}-[A-Za-z0-9
 const RESOURCE_MAX_BYTES=4194304;
 function mediaMime(path){return path.endsWith(".pdf")?"application/pdf":path.endsWith(".png")?"image/png":"image/jpeg"}
 function validMediaBytes(path,bytes){
-  if(!bytes||bytes.length<100||bytes.length>(RESOURCE_REF.test(path)?RESOURCE_MAX_BYTES:1572864))return false;
+  if(!bytes||bytes.length<100||bytes.length>((RESOURCE_REF.test(path)||PRIVATE_MEDIA_REF.test(path)&&path.includes("chen-resource-"))?RESOURCE_MAX_BYTES:1572864))return false;
   if(path.endsWith(".jpg"))return bytes[0]===255&&bytes[1]===216&&bytes[bytes.length-2]===255&&bytes[bytes.length-1]===217;
   if(path.endsWith(".png")){
     const h=[137,80,78,71,13,10,26,10],e=[73,69,78,68,174,66,96,130];
@@ -253,6 +256,8 @@ function validMediaBytes(path,bytes){
 }
 async function uploadResource(request,session,env){
   if(env.ENABLE_MEDIA_UPLOADS!=="true")return fail("File uploads disabled",403);
+  const bucket=privateBucket(env);
+  if(!bucket)return fail("Private media storage is not configured",503);
   if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
   if(Number(request.headers.get("content-length")||0)>5700000)return fail("Upload too large",413);
   const raw=await request.text();if(raw.length>5700000)return fail("Upload too large",413);
@@ -261,18 +266,24 @@ async function uploadResource(request,session,env){
   let bytes;
   try{bytes=Uint8Array.from(atob(data.base64),c=>c.charCodeAt(0))}catch(_){return fail("Invalid file encoding",422)}
   const ext={"application/pdf":"pdf","image/jpeg":"jpg","image/png":"png"}[data.mime];
-  const path="assets/uploads/chen-resource-"+new Date().toISOString().slice(0,10)+"-"+random().slice(0,16)+"."+ext;
+  const path="private-media/chen-resource-"+new Date().toISOString().slice(0,10)+"-"+random().slice(0,16)+"."+ext;
   if(!validMediaBytes(path,bytes))return fail("File signature invalid or file exceeds 4 MB",422);
   try{
-    const result=await github("/repos/"+REPO+"/contents/"+path,session.token,{
-      method:"PUT",headers:{"content-type":"application/json"},
-      body:JSON.stringify({message:"Stage CHEN. actor resource for review",content:data.base64,branch:CONTENT_BRANCH})
-    });
-    return json({ok:true,path,url:IMAGE_URL_PREFIX+path,staging:true,commit:result.commit?.sha||null,mime:data.mime});
-  }catch(e){return fail("Could not upload actor resource",e.http===403?403:502)}
+    await bucket.put(path,bytes,{httpMetadata:{contentType:data.mime}});
+    return json({ok:true,path,url:path,staging:true,private:true,mime:data.mime});
+  }catch(_){return fail("Private document upload failed",502)}
 }
 const STAGED_IMAGE_PATH=/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg$/;
-async function readStagedAsset(session,relative){
+async function readStagedAsset(session,relative,env){
+  if(PRIVATE_MEDIA_REF.test(relative)){
+    const bucket=privateBucket(env);
+    if(!bucket)throw Error("Private media storage unavailable");
+    const object=await bucket.get(relative);
+    if(!object)throw Error("Private media not found");
+    const bytes=new Uint8Array(await object.arrayBuffer());
+    if(!validMediaBytes(relative,bytes))throw Error("Invalid private media content");
+    return {bytes,private:true};
+  }
   if(!STAGED_IMAGE_PATH.test(relative)&&!RESOURCE_REF.test(relative))throw Error("Invalid staged path");
   const asset=await github("/repos/"+REPO+"/contents/"+relative+"?ref="+encodeURIComponent(CONTENT_BRANCH),session.token);
   const max=RESOURCE_REF.test(relative)?RESOURCE_MAX_BYTES:1572864;
@@ -285,11 +296,11 @@ async function readStagedAsset(session,relative){
   if(bytes.length!==asset.size||!validMediaBytes(relative,bytes))throw Error("Invalid staged media content");
   return {sha:asset.sha,bytes};
 }
-async function previewStagedImage(request,session){
+async function previewStagedImage(request,session,env){
   const relative=new URL(request.url).searchParams.get("path")||"";
-  if(!STAGED_IMAGE_PATH.test(relative)&&!RESOURCE_REF.test(relative))return fail("Invalid staged media path",400);
+  if(!PRIVATE_MEDIA_REF.test(relative)&&!STAGED_IMAGE_PATH.test(relative)&&!RESOURCE_REF.test(relative))return fail("Invalid staged media path",400);
   try{
-    const media=await readStagedAsset(session,relative);
+    const media=await readStagedAsset(session,relative,env);
     return new Response(media.bytes,{headers:{"content-type":mediaMime(relative),"cache-control":"private, no-store","x-content-type-options":"nosniff","content-disposition":"inline"}});
   }catch(_){return fail("Staged media unavailable or invalid",404)}
 }
@@ -299,7 +310,9 @@ const IMAGE_URL_PREFIX="https://chenofficial0.github.io/portfolio/";
 const IMAGE_REF=/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg$/;
 const PREVIEW_HTML="https://chenofficial0.github.io/portfolio/";
 function stagedPath(value){
-  if(typeof value!=="string"||!value.startsWith(IMAGE_URL_PREFIX))return null;
+  if(typeof value!=="string")return null;
+  if(PRIVATE_MEDIA_REF.test(value))return value;
+  if(!value.startsWith(IMAGE_URL_PREFIX))return null;
   const path=value.slice(IMAGE_URL_PREFIX.length);
   return IMAGE_REF.test(path)||RESOURCE_REF.test(path)?path:null;
 }
@@ -387,7 +400,7 @@ async function preparePublish(session,env){
   const staged=imageRefs(draft.data);
   if(staged.length>120)return fail("Too many media files to publish at once",422);
   for(const path of staged){
-    try{await readStagedAsset(session,path)}catch(_){return fail("Staged file is unavailable or invalid: "+path,422)}
+    try{await readStagedAsset(session,path,env)}catch(_){return fail("Staged file is unavailable or invalid: "+path,422)}
   }
   const differences=["about","profile","works","gallery","contact"].filter(k=>JSON.stringify(draft.data[k])!==JSON.stringify(live.data[k]));
   const id=random();
@@ -421,12 +434,37 @@ async function confirmPublish(request,session,env){
     return fail("Remove legacy hero photo fields before publishing",422);
   const refs=imageRefs(draft.data);
   if(refs.length!==plan.media.length||refs.some((p,i)=>p!==plan.media[i]))return fail("Image list changed; review again",409);
+  const published=JSON.parse(JSON.stringify(draft.data));
+  const replacePrivate=value=>PRIVATE_MEDIA_REF.test(value||"")?IMAGE_URL_PREFIX+publicMediaPath(value):value;
+  const rewrite=(obj,fields)=>fields.forEach(key=>{if(typeof obj?.[key]==="string")obj[key]=replacePrivate(obj[key])});
+  rewrite(published.about,["hero_image","hero_image_secondary"]);
+  for(const h of published.about.hero_images||[])rewrite(h,["image"]);
+  rewrite(published.profile,["photo","model_card_pdf","resume_pdf","showreel_url"]);
+  for(const link of published.profile.links||[])rewrite(link,["url"]);
+  for(const work of published.works){rewrite(work,["cover"]);for(const still of work.stills||[])rewrite(still,["image"])}
+  for(const item of published.gallery)rewrite(item,["image"]);
   const mainCommit=await github("/repos/"+REPO+"/git/commits/"+mainHead,session.token);
-  const changes=[{path:CONTENT_PATH,mode:"100644",type:"blob",sha:draft.sha}];
+  let contentSha=draft.sha;
+  if(refs.some(path=>PRIVATE_MEDIA_REF.test(path))){
+    const uploaded=await github("/repos/"+REPO+"/git/blobs",session.token,{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({content:JSON.stringify(published,null,2)+"\\n",encoding:"utf-8"})
+    });
+    contentSha=uploaded.sha;
+  }
+  const changes=[{path:CONTENT_PATH,mode:"100644",type:"blob",sha:contentSha}];
   for(const path of refs){
     let asset;
-    try{asset=await readStagedAsset(session,path)}catch(_){return fail("Staged file is unavailable or invalid: "+path,422)}
-    changes.push({path,mode:"100644",type:"blob",sha:asset.sha});
+    try{asset=await readStagedAsset(session,path,env)}catch(_){return fail("Staged file is unavailable or invalid: "+path,422)}
+    let sha=asset.sha;
+    if(asset.private){
+      const blob=await github("/repos/"+REPO+"/git/blobs",session.token,{
+        method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({content:b64(asset.bytes),encoding:"base64"})
+      });
+      sha=blob.sha;
+    }
+    changes.push({path:asset.private?publicMediaPath(path):path,mode:"100644",type:"blob",sha});
   }
   const tree=await github("/repos/"+REPO+"/git/trees",session.token,{
     method:"POST",headers:{"content-type":"application/json"},
@@ -485,7 +523,7 @@ export default {
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return confirmPublish(request,s,env);
       }
-      if(method==="GET"&&path==="/api/media/preview")return previewStagedImage(request,s);
+      if(method==="GET"&&path==="/api/media/preview")return previewStagedImage(request,s,env);
       if(method==="POST"&&path==="/api/media/resource"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return uploadResource(request,s,env);
