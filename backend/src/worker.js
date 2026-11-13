@@ -772,6 +772,63 @@ async function confirmPrivatePublish(request,editor,env){
   return fail("Release not confirmed; inspect GitHub main before any retry",409);
  }
 }
+// Rollback is independently gated; it restores the preceding Git tree by creating
+// a fresh fast-forward commit, never force-pushes and cannot erase Git history.
+async function beginPrivateRollbackReview(request,editor,env){
+ if(!privateReleaseEnabled(env)||env.ENABLE_PRIVATE_ROLLBACK!=="true")
+  return fail("Private rollback is disabled",403);
+ if(request.headers.get("x-chen-csrf")!==editor.csrf)return fail("Invalid CSRF token",403);
+ let body;try{body=await request.json()}catch(_){return fail("Invalid rollback request",400)}
+ const publishedCommit=body?.publishedCommit;
+ if(body?.confirmation!=="REVIEW_PUBLIC_SITE_ROLLBACK"||
+    !/^[a-f0-9]{40}$/.test(publishedCommit||""))
+  return fail("Exact published commit confirmation required",422);
+ let current,commit,parent;
+ try{
+  current=await getGitHead(editor,"main");
+  if(current!==publishedCommit)return fail("Public site has changed since publication",409);
+  commit=await github("/repos/"+REPO+"/git/commits/"+publishedCommit,editor.token);
+  if(!/^Publish reviewed CHEN private revision [A-Za-z0-9_-]{32,64}$/.test(commit.message||"")||
+     !Array.isArray(commit.parents)||commit.parents.length!==1||
+     !/^[a-f0-9]{40}$/.test(commit.parents[0].sha))
+    return fail("Specified commit is not an eligible CHEN private publication",422);
+  parent=await github("/repos/"+REPO+"/git/commits/"+commit.parents[0].sha,editor.token);
+ }catch(_){return fail("GitHub rollback history unavailable",503)}
+ if(!/^[a-f0-9]{40}$/.test(parent?.tree?.sha||""))
+  return fail("Cannot verify previous public website tree",503);
+ const id=random();
+ await env.STUDIO_KV.put("private-rollback:"+await digest(id),JSON.stringify({
+  login:editor.login,commitSha:publishedCommit,previousTreeSha:parent.tree.sha,
+  expiresAt:Date.now()+300000
+ }),{expirationTtl:300});
+ return json({reviewId:id,publishedCommit,previousTreeSha:parent.tree.sha,
+  confirmationRequired:"RESTORE_PREVIOUS_PUBLIC_SITE",expiresInSeconds:300,
+  previousPublicationHistoryMayRemainPublic:true,restored:false});
+}
+async function confirmPrivateRollback(request,editor,env){
+ if(!privateReleaseEnabled(env)||env.ENABLE_PRIVATE_ROLLBACK!=="true")
+  return fail("Private rollback is disabled",403);
+ if(request.headers.get("x-chen-csrf")!==editor.csrf)return fail("Invalid CSRF token",403);
+ let body;try{body=await request.json()}catch(_){return fail("Invalid rollback confirmation",400)}
+ if(body?.confirmation!=="RESTORE_PREVIOUS_PUBLIC_SITE"||
+    typeof body.reviewId!=="string"||body.reviewId.length<12||body.reviewId.length>100)
+  return fail("Explicit rollback confirmation required",422);
+ const key="private-rollback:"+await digest(body.reviewId);
+ const record=await env.STUDIO_KV.get(key);
+ if(!record)return fail("Rollback review expired",409);
+ let approval;try{approval=JSON.parse(record)}catch(_){return fail("Corrupt rollback review",503)}
+ if(approval.login!==editor.login||approval.expiresAt<Date.now())
+  return fail("Rollback review expired or unauthorized",403);
+ await env.STUDIO_KV.delete(key);
+ try{
+  const done=await prepareRollback({
+   publication:{commitSha:approval.commitSha,previousTreeSha:approval.previousTreeSha},
+   confirmation:body.confirmation,adapter:makeGitHubPublishAdapter(editor.token)
+  });
+  return json({restored:true,commit:done.rollbackSha,
+   priorMediaMayRemainPublic:true});
+ }catch(_){return fail("Rollback not confirmed; inspect GitHub main before retrying",409)}
+}
 async function preparePublish(session,env){
   if(env.ENABLE_IMMUTABLE_DRAFTS==="true")return fail("Private revision release requires separate reviewed publish workflow",403);
   if(env.ENABLE_PRIVATE_DRAFTS==="true")return fail("Publishing private drafts is locked pending migration review",403);
@@ -958,6 +1015,14 @@ export default {
       if(method==="POST"&&path==="/api/publish/private-confirm"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return confirmPrivatePublish(request,s,env);
+      }
+      if(method==="POST"&&path==="/api/publish/private-rollback-review"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return beginPrivateRollbackReview(request,s,env);
+      }
+      if(method==="POST"&&path==="/api/publish/private-rollback-confirm"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return confirmPrivateRollback(request,s,env);
       }
       if(method==="GET"&&path==="/api/publish/plan")return preparePublish(s,env);
       if(method==="POST"&&path==="/api/publish/confirm"){
