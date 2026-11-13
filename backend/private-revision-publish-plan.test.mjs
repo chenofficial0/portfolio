@@ -45,6 +45,14 @@ for(const [path,value] of [
 const hidden=structuredClone(source);hidden.contact.other="private-kv/chen-hero-2026-11-12-8tp6PGMB_zcRxazp.jpg";
 await assert.rejects(planPrivateRevisionPublish({revisionId:rootId,data:hidden,liveData:base,validate:valid}),
  /PRIVATE_REF_IN_UNRECOGNIZED_FIELD/);
+const misplaced=structuredClone(source);
+misplaced.contact.image=photoA;
+await assert.rejects(planPrivateRevisionPublish({revisionId:rootId,data:misplaced,liveData:base,validate:valid}),
+ /PRIVATE_REF_IN_UNRECOGNIZED_FIELD/);
+const profileResource=structuredClone(source);
+profileResource.profile.links=[{label:"演員資料",kind:"jpg",url:"private-kv/chen-resource-2026-11-12-8tp6PGMB_zcRxazp.jpg"}];
+const profilePlan=await planPrivateRevisionPublish({revisionId:rootId,data:profileResource,liveData:base,validate:valid});
+assert.ok(profilePlan.media.some(x=>x.publicPath==="assets/uploads/chen-resource-2026-11-12-8tp6PGMB_zcRxazp.jpg"));
 const empty=await planPrivateRevisionPublish({revisionId:rootId,data:base,liveData:base,validate:valid});
 assert.equal(empty.media.length,0);assert.equal(empty.willExposePrivateMedia,false);
 assert.deepEqual(empty.changedSections,[]);
