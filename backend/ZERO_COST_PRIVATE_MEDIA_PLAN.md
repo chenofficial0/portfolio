@@ -46,3 +46,12 @@ Cloudflare Workers KV Free: 1 GB total storage/account, 25 MiB maximum value, 10
 - Need draft lifecycle, deletion confirmation, orphan detection and cleanup policy.
 - Need local test execution and complete permission, MIME, path, billing and concurrency verification.
 - Need explicit user acceptance before any Worker or website deployment.
+
+## Development update — private KV upload/delete API (not deployed)
+- `POST /api/media/private`: JPEG-only, 1 MiB maximum after processing, valid image markers, same-origin, editor session and CSRF. Requires both `ENABLE_MEDIA_UPLOADS=true` and new `ENABLE_KV_MEDIA_UPLOADS=true`; these remain OFF in the deployed Worker.
+- Conservative inventory guard requires per-object byte metadata; it rejects missing metadata, paginated inventories larger than reviewed bound, >=50 objects, or >50 MiB staged total. This guard is **not atomic** under concurrency and must not be described as a guaranteed hard limit. KV Free account limits remain the ultimate free-tier boundary.
+- `DELETE /api/media/private`: requires separate `ENABLE_KV_MEDIA_DELETES=true`, valid session, origin, CSRF, an exact private path, confirmation phrase, and a currently saved draft with no reference to the file. Deletion does not rewrite Git history and KV propagation may be delayed.
+- Deleting one blob cannot establish whether copies were kept elsewhere or on prior public Git branches.
+- No UI delete controls have been wired. Do not enable upload or deletion flags yet.
+- All changes remain exclusively on `feature/zero-cost-private-media`; never merge or deploy without tests and explicit review.
+- Isolated test files have been updated but have **not been executed**.
