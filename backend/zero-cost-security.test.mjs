@@ -279,6 +279,19 @@ assert.equal((await request("/api/draft/revisions")).status,403);
 delete env.ENABLE_IMMUTABLE_DRAFTS;
 delete env.PRIVATE_DRAFT_KV;
 
+// Private editor must not be reachable before release flags, and never anonymously.
+assert.equal((await request("/studio/private")).status,403);
+assert.equal((await (await request("/api/session")).json()).canUseImmutableStudio,false);
+env.ENABLE_PRIVATE_STUDIO="true";
+assert.equal((await request("/studio/private")).status,403);
+env.ENABLE_IMMUTABLE_DRAFTS="true";
+assert.equal((await request("/studio/private")).status,403);
+env.ENABLE_REVISION_COMPARISON="true";
+assert.equal((await (await request("/api/session")).json()).canUseImmutableStudio,true);
+assert.equal((await worker.fetch(new Request(origin+"/studio/private"),env)).status,401);
+delete env.ENABLE_PRIVATE_STUDIO;
+delete env.ENABLE_IMMUTABLE_DRAFTS;
+delete env.ENABLE_REVISION_COMPARISON;
 // The live-bound KV namespace never receives migration writes from a diagnostic route.
 assert.equal((await request("/api/migration/readiness")).status,403);
 assert.equal((await worker.fetch(new Request(origin+"/api/migration/readiness"),env)).status,401);
