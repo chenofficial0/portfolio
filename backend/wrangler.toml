@@ -2,6 +2,8 @@ name = "chen-content-studio-api"
 main = "src/worker.js"
 compatibility_date = "2026-11-12"
 workers_dev = true
+# Keep existing dashboard-managed runtime variables and secrets during version uploads.
+keep_vars = true
 
 # Existing studio session KV; do not modify or delete this namespace.
 [[kv_namespaces]]
