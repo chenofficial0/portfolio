@@ -6,7 +6,7 @@ import {
 
 const blob = new Map();
 const kv = {
-  async put(k, v) { blob.set(k, Uint8Array.from(v)); },
+  async put(k, v) { blob.set(k, new Uint8Array(v).slice()); },
   async get(k) { const b = blob.get(k); return b ? b.slice().buffer : null; },
   async delete(k) { blob.delete(k); }
 };
