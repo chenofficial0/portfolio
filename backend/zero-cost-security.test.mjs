@@ -277,6 +277,32 @@ assert.equal((await request("/api/draft/revisions")).status,403);
 delete env.ENABLE_IMMUTABLE_DRAFTS;
 delete env.PRIVATE_DRAFT_KV;
 
+// The live-bound KV namespace never receives migration writes from a diagnostic route.
+assert.equal((await request("/api/migration/readiness")).status,403);
+assert.equal((await worker.fetch(new Request(origin+"/api/migration/readiness"),env)).status,401);
+let auditedReads=0,diagnosticWrites=0;
+env.PRIVATE_DRAFT_KV={
+  get:async()=>{auditedReads++;return null},
+  list:async()=>{auditedReads++;return {keys:[],list_complete:true}},
+  put:async()=>{diagnosticWrites++;throw Error("Readiness must never write")},
+  delete:async()=>{diagnosticWrites++;throw Error("Readiness must never delete")}
+};
+env.ENABLE_MIGRATION_AUDIT="true";
+const ready=await request("/api/migration/readiness");
+assert.equal(ready.status,200);
+assert.equal((await ready.json()).ready,true);
+assert.ok(auditedReads>0);
+assert.equal(diagnosticWrites,0);
+env.PRIVATE_DRAFT_KV.list=async()=>({keys:[{name:"already-present"}],list_complete:true});
+const occupied=await request("/api/migration/readiness");
+assert.equal(occupied.status,200);
+assert.equal((await occupied.json()).ready,false);
+env.PRIVATE_DRAFT_KV.list=async()=>({keys:[],list_complete:false,cursor:"next"});
+assert.equal((await request("/api/migration/readiness")).status,503);
+assert.equal(diagnosticWrites,0);
+delete env.ENABLE_MIGRATION_AUDIT;
+delete env.PRIVATE_DRAFT_KV;
+
 // Immutable history has its own disabled-by-default gate.
 assert.equal((await request("/api/draft/revision?id=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")).status,403);
 assert.equal((await request("/api/draft/revision","POST",
