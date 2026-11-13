@@ -5,3 +5,5 @@ Inspect only the existing Worker version list and active deployment.
 The previous upload command reported an upload then failed at a
 separate Workers subdomain API call (HTTP authentication code 10000).
 No additional upload, deploy, delete, or configuration change is authorized.
+
+Re-run after adjusting API response parsing; read-only operations only.
