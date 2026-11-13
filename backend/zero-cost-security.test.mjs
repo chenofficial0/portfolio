@@ -116,4 +116,10 @@ assert.equal((await request("/api/content","PUT",
   {origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"},"{}")).status,422);
 delete env.ENABLE_PRIVATE_DRAFTS;
 
+// Immutable history has its own disabled-by-default gate.
+assert.equal((await request("/api/draft/revision?id=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")).status,403);
+assert.equal((await request("/api/draft/revision","POST",
+  {origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"},
+  JSON.stringify({parentId:null,data:{}}))).status,403);
+assert.equal((await worker.fetch(new Request(origin+"/api/draft/revision?id=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),env)).status,401);
 console.log("PASS: session flags, editor auth, wrong origin, missing CSRF, live publish disabled, media uploads disabled, anonymous reads denied.");
