@@ -1,0 +1,32 @@
+name: CHEN Phase 20 Controlled Read-Only Studio Rollout
+
+on:
+  push:
+    branches:
+      - feature/zero-cost-private-media
+    paths:
+      - "backend/TRIGGER_PHASE20_READONLY_ROLLOUT.md"
+
+permissions:
+  contents: read
+
+jobs:
+  readonly-production-rollout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Reconfirm private read-only safety and exact release config
+        run: |
+          node --check backend/phase20-controlled-readonly-activate.mjs
+          node backend/phase20-readonly-candidate.test.mjs
+          node backend/zero-cost-security.test.mjs
+      - name: Deploy only exact audited read-only Worker version with v85 fallback
+        env:
+          CLOUDFLARE_WORKER_EDITOR_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_EDITOR_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CHEN_DEPLOY_READONLY_STUDIO: CONFIRM_READONLY_PRIVATE_STUDIO
+        run: node backend/phase20-controlled-readonly-activate.mjs
