@@ -137,7 +137,6 @@ try{
     await page.getByRole("button",{name:"最終確認並公開發布"}).click();
     await page.getByText(/已提交正式網站更新/).waitFor();
     assert.equal(publicWrites,1);
- assert.equal(rollbackWrites,1);
     await page.getByRole("button",{name:"還原這次正式發布"}).click();
     await page.getByText(/網站內容已提交還原/).waitFor();
     assert.equal(rollbackWrites,1);
@@ -149,6 +148,7 @@ try{
  assert.equal(saves,2);
  assert.equal(reviewWrites,1);
  assert.equal(publicWrites,1);
+ assert.equal(rollbackWrites,1);
  assert.equal(legacyWrites,0);
  assert.ok(reads>=2);
  assert.deepEqual(snapshots.get(rootId),source,"Original snapshot must remain unchanged");
