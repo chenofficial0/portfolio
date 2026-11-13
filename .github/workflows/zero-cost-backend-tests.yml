@@ -77,3 +77,17 @@ jobs:
           node-version: "22"
       - name: Verify live public site and anonymous API without writes
         run: node backend/phase18-live-readonly.test.mjs
+
+  wrangler-dry-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Bundle Worker with supplied KV binding (no deployment)
+        run: |
+          npx --yes wrangler@4.47.0 deploy --dry-run --config backend/wrangler.toml --outdir /tmp/chen-worker-dry-run
