@@ -43,4 +43,5 @@ jobs:
           node backend/private-kv-revision-list.test.mjs
           node backend/private-kv-merge-preview.test.mjs
           node backend/private-kv-merge-save.test.mjs
+          node backend/migration-preflight.test.mjs
           node backend/zero-cost-security.test.mjs
