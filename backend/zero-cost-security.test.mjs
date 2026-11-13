@@ -71,6 +71,14 @@ assert.equal((await worker.fetch(new Request(origin + "/api/content"), env)).sta
 assert.equal((await worker.fetch(new Request(origin + "/api/preview-content"), env)).status, 401);
 assert.equal((await worker.fetch(new Request(origin + "/api/media/preview"), env)).status, 401);
 
+// Deletion always fails closed until a separate opt-in flag is reviewed.
+const deniedDelete = await request("/api/media/private", "DELETE",
+  { origin, "x-chen-csrf": "test-csrf-only", "content-type": "application/json" },
+  JSON.stringify({path:"private-kv/chen-hero-2026-11-13-abcdefghijklmnop.jpg",confirmation:"DELETE_PRIVATE_MEDIA"}));
+assert.equal(deniedDelete.status, 403);
+assert.match((await deniedDelete.json()).error, /disabled/i);
+assert.equal((await request("/api/media/private", "DELETE", {origin:"https://untrusted.invalid"}, "{}")).status,403);
+
 // Private KV media preview is read-only and authenticated; no public GitHub call.
 const image = new Uint8Array(100).fill(1);
 image.set([255, 216], 0); image.set([255, 217], 98);
