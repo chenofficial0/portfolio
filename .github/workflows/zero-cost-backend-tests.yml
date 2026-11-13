@@ -46,3 +46,20 @@ jobs:
           node backend/migration-preflight.test.mjs
           node backend/zero-cost-security.test.mjs
           node backend/phase15-acceptance.test.mjs
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install isolated browser test dependency
+        run: npm install --prefix backend --no-save --package-lock=false --ignore-scripts playwright@1.56.1
+      - name: Install Chromium
+        run: ./backend/node_modules/.bin/playwright install chromium
+      - name: Run desktop and mobile browser smoke tests
+        run: node backend/phase16-browser-smoke.test.mjs
