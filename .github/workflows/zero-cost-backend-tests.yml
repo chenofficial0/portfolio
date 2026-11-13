@@ -34,6 +34,7 @@ jobs:
           node --check backend/src/private-kv-revision-list.js
           node --check backend/src/private-kv-merge-preview.js
           node --check backend/src/private-kv-merge-save.js
+          node --check backend/src/private-kv-migration-audit.js
       - name: Run isolated tests without external deployment
         run: |
           node backend/private-kv-media.test.mjs
@@ -47,6 +48,7 @@ jobs:
           node backend/zero-cost-security.test.mjs
           node backend/phase15-acceptance.test.mjs
           node backend/phase17-migration-dry-run.test.mjs
+          node backend/private-kv-migration-audit.test.mjs
 
   browser-smoke:
     runs-on: ubuntu-24.04
