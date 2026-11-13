@@ -33,6 +33,7 @@ jobs:
           node --check backend/src/revision-compare-page.js
           node --check backend/src/private-kv-revision-list.js
           node --check backend/src/private-kv-merge-preview.js
+          node --check backend/src/private-kv-merge-save.js
       - name: Run isolated tests without external deployment
         run: |
           node backend/private-kv-media.test.mjs
@@ -41,4 +42,5 @@ jobs:
           node backend/private-kv-compare.test.mjs
           node backend/private-kv-revision-list.test.mjs
           node backend/private-kv-merge-preview.test.mjs
+          node backend/private-kv-merge-save.test.mjs
           node backend/zero-cost-security.test.mjs
