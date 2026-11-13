@@ -19,7 +19,8 @@ if(!TOKEN||!ACCOUNT||!/^[a-f0-9]{32}$/.test(ACCOUNT)){
     return result.result;
   }
   try{
-    const versions=await api("/versions?per_page=10");
+    const versionsResult=await api("/versions?per_page=10");
+    const versions=Array.isArray(versionsResult)?versionsResult:versionsResult?.versions;
     if(!Array.isArray(versions))throw Error("WORKER_VERSIONS_FORMAT_UNEXPECTED");
     // Cloudflare returns a version list ordered latest-first, not an active deployment.
     const recent=versions.slice(0,5).map(v=>({
