@@ -119,7 +119,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
 (() => {
   "use strict";
   const DATA_URL = new URL("https://raw.githubusercontent.com/chenofficial0/portfolio/main/content/site.json");
-  const isWorkerHost = location.pathname==="/studio" && location.protocol==="https:";
+  const isWorkerHost = (location.pathname==="/studio"||location.pathname==="/studio/private") && location.protocol==="https:";
   let apiSession=null,contentSha=null,privateMode=false,privateRevisionId=null;
   const pages = {
     dashboard:["OVERVIEW","網站管理總覽","檢視目前內容完整度，選擇要編輯的網站區域。"],
@@ -830,7 +830,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
         }
       }catch(error){notice.textContent="後端尚未準備完成："+error.message+"。目前僅提供預覽與 JSON 匯出。";}
     }
-    if(!apiSession){
+    if(!apiSession && location.pathname!=="/studio/private"){
       try{
         const r=await fetch(DATA_URL,{cache:"no-store"});
         if(!r.ok)throw Error("HTTP "+r.status);
