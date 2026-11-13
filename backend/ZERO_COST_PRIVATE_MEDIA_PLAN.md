@@ -67,3 +67,13 @@ Cloudflare Workers KV Free: 1 GB total storage/account, 25 MiB maximum value, 10
 - Private draft data should not be initialized automatically from a publicly accessible Git branch. Migration needs explicit review of exact source, export, destination, backup, image references and rollback.
 - Existing public Git commits remain publicly accessible; moving newer copies to private KV does not erase historical exposure.
 - Tests `backend/private-kv-draft.test.mjs`, `backend/private-kv-media.test.mjs`, and `backend/zero-cost-security.test.mjs` have been created but not run on this branch. Environment couldn't download repo sources for a local test, so treat results as UNVERIFIED.
+
+## Concurrent edit protection — immutable revision trial (2026-11-13)
+- Experimental `backend/src/private-kv-revisions.js` creates one **new** random KV key per revision. Two edits from the same parent can coexist without overwriting the parent's data. Keys are never intentionally reused or deleted by the journal.
+- `GET /api/draft/revision?id=...` fetches a specific version after normal editor authentication. `POST /api/draft/revision` appends a new version with Origin, CSRF, session, schema and size checks. Both require `ENABLE_IMMUTABLE_DRAFTS=true`, which is **false** by default.
+- The current `GET/PUT /api/content` UI workflow remains unchanged. No automatic switch to immutable mode, no automatic migration, and no publication from immutable revisions.
+- An immutable revision journal prevents overwriting old version keys. It does **not** automatically detect or reconcile competing edits, guarantee immediate visibility across Cloudflare regions, or impose an atomic account-wide quota.
+- A future UI must explicitly select a revision, show competing children, and require manual reconciliation before designating a release candidate. Do not pick a "latest" entry by timestamp alone.
+- Each append consumes KV storage and one write. Add retention and owner-approved cleanup policy after backup; do not enable unlimited append.
+- Tests in `backend/private-kv-revisions.test.mjs` and `backend/zero-cost-security.test.mjs` were committed but are **not recorded as executed**.
+- Keep `ENABLE_LIVE_PUBLISH=false`, `ENABLE_MEDIA_UPLOADS=false`, and `ENABLE_IMMUTABLE_DRAFTS=false`. No paid service is enabled by this branch.
