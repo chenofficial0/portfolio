@@ -134,7 +134,14 @@ env.PRIVATE_DRAFT_KV={
     if(revisionRecords.has(key))throw Error("Immutable revision overwritten");
     revisionRecords.set(key,value);
   },
-  delete:async()=>{throw Error("Revision deletion not allowed")}
+  delete:async()=>{throw Error("Revision deletion not allowed")},
+  list:async ({prefix,limit,cursor})=>{
+    const matches=[...revisionRecords.keys()].filter(key=>key.startsWith(prefix)).sort();
+    const start=cursor?Number(cursor.slice(1)):0;
+    return {keys:matches.slice(start,start+limit).map(name=>({name})),
+      list_complete:start+limit>=matches.length,
+      cursor:start+limit<matches.length?"p"+(start+limit):""};
+  }
 };
 env.ENABLE_IMMUTABLE_DRAFTS="true";
 const validDraft={about:{},profile:{},contact:{},works:[],gallery:[]};
@@ -174,6 +181,17 @@ const renderedPage=await comparisonPage.text();
 assert.match(renderedPage,/草稿版本比較/);
 assert.match(renderedPage,/api\/draft\/compare/);
 assert.equal((await worker.fetch(new Request(origin+"/studio/revisions"),env)).status,401);
+const listingResponse=await request("/api/draft/revisions");
+assert.equal(listingResponse.status,200);
+assert.equal(listingResponse.headers.get("cache-control"),"no-store");
+const listing=await listingResponse.json();
+assert.equal(listing.revisions.length,3);
+assert.equal(listing.complete,true);
+assert.equal(listing.revisions.find(x=>x.id===desktopId).parentId,rootRevision.id);
+assert.equal("data" in listing.revisions[0],false);
+assert.equal((await request("/api/draft/revisions?cursor=%2E%2E%2Fbad")).status,400);
+assert.equal((await worker.fetch(new Request(origin+"/api/draft/revisions"),env)).status,401);
+assert.match(renderedPage,/api\/draft\/revisions/);
 const comparePath="/api/draft/compare?base="+rootRevision.id+"&left="+desktopId+"&right="+mobileId;
 const threeWayResponse=await request(comparePath);
 assert.equal(threeWayResponse.status,200);
@@ -188,6 +206,7 @@ assert.equal((await request("/api/draft/compare?base="+desktopId+"&left="+rootRe
 delete env.ENABLE_REVISION_COMPARISON;
 assert.equal((await request("/studio/revisions")).status,403);
 assert.equal((await request(comparePath)).status,403);
+assert.equal((await request("/api/draft/revisions")).status,403);
 delete env.ENABLE_IMMUTABLE_DRAFTS;
 delete env.PRIVATE_DRAFT_KV;
 
