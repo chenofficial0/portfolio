@@ -37,7 +37,8 @@ const env={
   const file=bundle.media.find(x=>x.key===k);
   if(file&&format==="arrayBuffer")return file.bytes.buffer.slice(file.bytes.byteOffset,file.bytes.byteOffset+file.bytes.byteLength);
   return null;
- }}
+ },put:async()=>{throw Error("PRIVATE_KV_WRITE_FORBIDDEN_IN_REVIEW")},
+ delete:async()=>{throw Error("PRIVATE_KV_DELETE_FORBIDDEN_IN_REVIEW")}}
 };
 let head=baseHead,gitWrites=0,refUpdates=0;
 const response=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json"}});
