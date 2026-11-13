@@ -126,6 +126,46 @@ assert.equal((await request("/api/draft/revision","POST",
 assert.equal((await request("/api/draft/revision?id=bad")).status,400);
 delete env.ENABLE_IMMUTABLE_DRAFTS;
 
+// Authenticated append-only revisions preserve both concurrent device edits.
+const revisionRecords=new Map();
+env.PRIVATE_DRAFT_KV={
+  get: async key=>revisionRecords.get(key)??null,
+  put: async (key,value)=>{
+    if(revisionRecords.has(key))throw Error("Immutable revision overwritten");
+    revisionRecords.set(key,value);
+  },
+  delete:async()=>{throw Error("Revision deletion not allowed")}
+};
+env.ENABLE_IMMUTABLE_DRAFTS="true";
+const validDraft={about:{},profile:{},contact:{},works:[],gallery:[]};
+const revisionHeaders={origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"};
+const rootResult=await request("/api/draft/revision","POST",revisionHeaders,
+  JSON.stringify({parentId:null,data:validDraft}));
+assert.equal(rootResult.status,201);
+const rootRevision=await rootResult.json();
+assert.equal(rootRevision.immutable,true);
+const revisionUrl=id=>"/api/draft/revision?id="+encodeURIComponent(id);
+const parentRead=await request(revisionUrl(rootRevision.id));
+assert.equal(parentRead.status,200);
+assert.deepEqual((await parentRead.json()).data,validDraft);
+const desktop={...validDraft,about:{name_zh:"Desktop version"}};
+const mobile={...validDraft,about:{name_zh:"Mobile version"}};
+const [desktopResponse,mobileResponse]=await Promise.all([
+  request("/api/draft/revision","POST",revisionHeaders,JSON.stringify({parentId:rootRevision.id,data:desktop})),
+  request("/api/draft/revision","POST",revisionHeaders,JSON.stringify({parentId:rootRevision.id,data:mobile}))
+]);
+assert.equal(desktopResponse.status,201);
+assert.equal(mobileResponse.status,201);
+const desktopId=(await desktopResponse.json()).id;
+const mobileId=(await mobileResponse.json()).id;
+assert.notEqual(desktopId,mobileId);
+assert.deepEqual((await (await request(revisionUrl(desktopId))).json()).data,desktop);
+assert.deepEqual((await (await request(revisionUrl(mobileId))).json()).data,mobile);
+assert.deepEqual((await (await request(revisionUrl(rootRevision.id))).json()).data,validDraft);
+assert.equal((await worker.fetch(new Request(origin+revisionUrl(rootRevision.id)),env)).status,401);
+delete env.ENABLE_IMMUTABLE_DRAFTS;
+delete env.PRIVATE_DRAFT_KV;
+
 // Immutable history has its own disabled-by-default gate.
 assert.equal((await request("/api/draft/revision?id=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")).status,403);
 assert.equal((await request("/api/draft/revision","POST",
