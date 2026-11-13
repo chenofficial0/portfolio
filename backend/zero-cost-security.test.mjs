@@ -229,6 +229,40 @@ assert.equal(revisionRecords.size,storedCount);
 assert.equal((await postMerge({...mergeBase,decisions:{"/about/name_zh":"base"}})).status,422);
 assert.equal((await postMerge({...mergeBase,decisions:{"/bad/path":"left"}})).status,422);
 assert.match(renderedPage,/api\/draft\/merge-preview/);
+// Save is a separate explicit opt-in: compare capability does not permit storing merges.
+const reviewedMerge={...mergeBase,decisions:{"/about/name_zh":"left"}};
+const previewForSave=await postMerge(reviewedMerge);
+assert.equal(previewForSave.status,200);
+const previewHash=(await previewForSave.json()).previewDigest;
+assert.match(previewHash,/^[a-f0-9]{64}$/);
+const saveRequest=(body,headers={origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"})=>
+  request("/api/draft/merge-save","POST",headers,JSON.stringify(body));
+assert.equal((await saveRequest({...reviewedMerge,previewDigest:previewHash,
+ confirmation:"SAVE_MERGE_AS_NEW_REVISION"})).status,403);
+env.ENABLE_MERGE_SAVES="true";
+assert.equal((await saveRequest({...reviewedMerge,previewDigest:previewHash,
+ confirmation:"SAVE_MERGE_AS_NEW_REVISION"},{origin,"content-type":"application/json"})).status,403);
+assert.equal((await saveRequest({...reviewedMerge,previewDigest:previewHash,
+ confirmation:"SAVE_MERGE_AS_NEW_REVISION"},{origin:"https://not-allowed.invalid",
+ "x-chen-csrf":"test-csrf-only","content-type":"application/json"})).status,403);
+assert.equal((await saveRequest({...reviewedMerge,previewDigest:previewHash})).status,422);
+assert.equal((await saveRequest({...reviewedMerge,previewDigest:"0".repeat(64),
+ confirmation:"SAVE_MERGE_AS_NEW_REVISION"})).status,409);
+const countBeforeSave=revisionRecords.size;
+const saveResponse=await saveRequest({...reviewedMerge,previewDigest:previewHash,
+ confirmation:"SAVE_MERGE_AS_NEW_REVISION"});
+assert.equal(saveResponse.status,201);
+const resultSave=await saveResponse.json();
+assert.equal(resultSave.ok,true);
+assert.equal(resultSave.published,false);
+assert.equal(resultSave.originalRevisionsPreserved,true);
+assert.equal(resultSave.revision.parentId,rootRevision.id);
+assert.equal(revisionRecords.size,countBeforeSave+1);
+const storedMerge=(await (await request(revisionUrl(resultSave.revision.id))).json()).data;
+assert.equal(storedMerge.about.name_zh,"Desktop version");
+assert.deepEqual((await (await request(revisionUrl(rootRevision.id))).json()).data,validDraft);
+assert.deepEqual((await (await request(revisionUrl(mobileId))).json()).data,mobile);
+delete env.ENABLE_MERGE_SAVES;
 delete env.ENABLE_REVISION_COMPARISON;
 assert.equal((await request("/studio/revisions")).status,403);
 assert.equal((await request(comparePath)).status,403);
