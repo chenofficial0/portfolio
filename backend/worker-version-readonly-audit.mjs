@@ -30,7 +30,8 @@ if(!TOKEN||!ACCOUNT||!/^[a-f0-9]{32}$/.test(ACCOUNT)){
     }));
     console.log("PASS: scoped token can list Worker versions.");
     console.log("Latest Worker version metadata: "+JSON.stringify(recent));
-    const deployments=await api("/deployments");
+    const deploymentResult=await api("/deployments");
+    const deployments=deploymentResult?.deployments;
     if(!Array.isArray(deployments))throw Error("WORKER_DEPLOYMENTS_FORMAT_UNEXPECTED");
     console.log("PASS: scoped token can read Worker deployments.");
     console.log("Current deployment version IDs: "+JSON.stringify(
