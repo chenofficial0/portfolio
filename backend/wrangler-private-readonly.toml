@@ -1,0 +1,46 @@
+# Strict read-only candidate: no immutable appends, media mutations, or live publishing.
+name = "chen-content-studio-api"
+main = "src/worker.js"
+compatibility_date = "2026-11-12"
+workers_dev = true
+# Keep existing dashboard-managed runtime variables and secrets during version uploads.
+keep_vars = true
+
+# Existing studio session KV; do not modify or delete this namespace.
+[[kv_namespaces]]
+binding = "STUDIO_KV"
+id = "f5115459b9a0488186850f92f1ee8cfc"
+
+# Separate private draft/media namespace, supplied by the owner.
+# Existing KV assets are readable to the authenticated editor; no private writes or publication.
+[[kv_namespaces]]
+binding = "PRIVATE_DRAFT_KV"
+id = "aad4672cc5474625b8fc0f070e75bc99"
+
+[vars]
+# Staged private editor READ ONLY: existing immutable KV versions may be viewed but never modified.
+ENABLE_CONTENT_WRITES = "false"
+ENABLE_MEDIA_UPLOADS = "false"
+ENABLE_DRAFT_SAVES = "true"
+# Migration flags remain OFF until namespace access, data copy and release tests are verified.
+ENABLE_PRIVATE_DRAFTS = "false"
+ENABLE_IMMUTABLE_DRAFTS = "true"
+ENABLE_IMMUTABLE_DRAFT_WRITES = "false"
+ENABLE_REVISION_COMPARISON = "true"
+ENABLE_MERGE_SAVES = "false"
+ENABLE_MIGRATION_AUDIT = "false"
+ENABLE_PRIVATE_STUDIO = "true"
+ENABLE_PRIVATE_PUBLISH_PLANS = "false"
+ENABLE_PRIVATE_PUBLISH_CONFIRM = "false"
+ENABLE_PRIVATE_ROLLBACK = "false"
+ENABLE_KV_MEDIA_UPLOADS = "false"
+ENABLE_KV_MEDIA_DELETES = "false"
+# Release remains locked until staging preview and publish workflow pass acceptance checks.
+ENABLE_LIVE_PUBLISH = "false"
+# Must match the exact deployed API origin, e.g. https://chen-content-studio-api.YOUR-SUBDOMAIN.workers.dev
+PUBLIC_API_ORIGIN = "https://chen-content-studio-api.clyichen0312.workers.dev"
+GITHUB_CLIENT_ID = "Ov23lidWfrNSvOTLZnoC"
+
+# Secrets (set with wrangler secret put; NEVER commit them):
+# GITHUB_CLIENT_SECRET
+# SESSION_ENCRYPTION_KEY  (base64-encoded 32 random bytes)
