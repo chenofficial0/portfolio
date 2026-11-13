@@ -2,6 +2,13 @@ name: CHEN Cloudflare KV Read-Only Verification
 
 # Manual trigger only. NEVER deploys, writes a KV key or changes a Worker.
 on:
+  # The workflow lives on an isolated branch; workflow_dispatch from the UI
+  # requires a copy on default branch, so use an explicit feature-branch trigger file.
+  push:
+    branches:
+      - feature/zero-cost-private-media
+    paths:
+      - "backend/TRIGGER_CLOUDFLARE_KV_READONLY_AUDIT.md"
   workflow_dispatch:
 
 permissions:
