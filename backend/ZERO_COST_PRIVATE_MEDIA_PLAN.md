@@ -77,3 +77,9 @@ Cloudflare Workers KV Free: 1 GB total storage/account, 25 MiB maximum value, 10
 - Each append consumes KV storage and one write. Add retention and owner-approved cleanup policy after backup; do not enable unlimited append.
 - Tests in `backend/private-kv-revisions.test.mjs` and `backend/zero-cost-security.test.mjs` were committed but are **not recorded as executed**.
 - Keep `ENABLE_LIVE_PUBLISH=false`, `ENABLE_MEDIA_UPLOADS=false`, and `ENABLE_IMMUTABLE_DRAFTS=false`. No paid service is enabled by this branch.
+
+## Testing and fail-closed changes (2026-11-13)
+- Added `.github/workflows/zero-cost-backend-tests.yml` with standard `ubuntu-latest` runner and Node 22, scoped to this feature branch. No paid/larger runners, secrets, caches, deployments, or artifacts.
+- GitHub Actions run status could not be independently confirmed through current connector results; treat tests as **NOT VERIFIED PASSED**. Inspect Actions results before merging.
+- Changed Worker `PUT /api/content` so `ENABLE_PRIVATE_DRAFTS=true` now refuses mutable private draft writes (HTTP 403) rather than using KV's non-atomic overwrite path. An immutable revision endpoint remains experimental and disabled.
+- Older `private-kv-draft.js` remains a non-live prototype for migration tests. It must NOT be promoted as concurrency-safe.
