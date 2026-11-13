@@ -17,6 +17,7 @@ ENABLE_DRAFT_SAVES = "true"
 # Migration flags remain OFF until private KV namespace is provisioned, data copied and tests pass.
 ENABLE_PRIVATE_DRAFTS = "false"
 ENABLE_IMMUTABLE_DRAFTS = "false"
+ENABLE_REVISION_COMPARISON = "false"
 ENABLE_KV_MEDIA_UPLOADS = "false"
 ENABLE_KV_MEDIA_DELETES = "false"
 # Release remains locked until staging preview and publish workflow pass acceptance checks.
