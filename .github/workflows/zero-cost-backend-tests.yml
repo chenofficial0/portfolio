@@ -36,6 +36,7 @@ jobs:
           node --check backend/src/private-kv-merge-save.js
           node --check backend/src/private-kv-migration-audit.js
           node --check backend/src/cloudflare-remote-kv-audit.js
+          node --check backend/src/private-kv-migration-bundle.js
       - name: Run isolated tests without external deployment
         run: |
           node backend/private-kv-media.test.mjs
@@ -51,6 +52,7 @@ jobs:
           node backend/phase17-migration-dry-run.test.mjs
           node backend/private-kv-migration-audit.test.mjs
           node backend/cloudflare-remote-kv-audit.test.mjs
+          node backend/private-kv-migration-bundle.test.mjs
 
   browser-smoke:
     runs-on: ubuntu-24.04
