@@ -67,7 +67,9 @@ jobs:
       - name: Install Chromium
         run: ./backend/node_modules/.bin/playwright install chromium
       - name: Run desktop and mobile browser smoke tests
-        run: node backend/phase16-browser-smoke.test.mjs
+        run: |
+          node backend/phase16-browser-smoke.test.mjs
+          node backend/private-studio-browser.test.mjs
 
   production-readonly-smoke:
     runs-on: ubuntu-24.04
