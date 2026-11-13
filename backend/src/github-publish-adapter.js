@@ -9,7 +9,9 @@ const b64=(bytes)=>{
  return btoa(out);
 };
 const sha=v=>{if(!SHA.test(v||""))throw Error("GITHUB_GIT_SHA_INVALID");return v};
-export function makeGitHubPublishAdapter(token,{fetchImpl=fetch}={}){
+export function makeGitHubPublishAdapter(token,{fetchImpl=fetch,branch="main"}={}){
+ if(branch!=="main"&&!/^test\/chen-release-rehearsal-[0-9]{8}$/.test(branch))
+  throw Error("GITHUB_RELEASE_BRANCH_NOT_ALLOWED");
  if(typeof token!=="string"||token.length<1)throw Error("GITHUB_TOKEN_UNAVAILABLE");
  const api=async(endpoint,{method="GET",body}={})=>{
   const res=await fetchImpl(ROOT+endpoint,{
@@ -23,7 +25,7 @@ export function makeGitHubPublishAdapter(token,{fetchImpl=fetch}={}){
  };
  return {
   async getMainSha(){
-   const result=await api("/git/ref/heads/main");
+   const result=await api("/git/ref/heads/"+branch);
    return sha(result?.object?.sha);
   },
   async getMainTreeSha(commitSha){
@@ -67,7 +69,7 @@ export function makeGitHubPublishAdapter(token,{fetchImpl=fetch}={}){
   },
   async updateMainRef(commitSha,{force}={}){
    if(force!==false)throw Error("FORCE_PUSH_FORBIDDEN");
-   const result=await api("/git/refs/heads/main",{method:"PATCH",body:{sha:sha(commitSha),force:false}});
+   const result=await api("/git/refs/heads/"+branch,{method:"PATCH",body:{sha:sha(commitSha),force:false}});
    return sha(result?.object?.sha);
   }
  };
