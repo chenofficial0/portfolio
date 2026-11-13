@@ -46,6 +46,7 @@ jobs:
           node backend/migration-preflight.test.mjs
           node backend/zero-cost-security.test.mjs
           node backend/phase15-acceptance.test.mjs
+          node backend/phase17-migration-dry-run.test.mjs
 
   browser-smoke:
     runs-on: ubuntu-24.04
