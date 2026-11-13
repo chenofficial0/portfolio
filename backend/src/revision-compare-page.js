@@ -107,9 +107,14 @@ function renderVersionOptions(){
  chooseOptions(rightSelect,children,"選擇版本 B");
  button.disabled=!baseSelect.value||!leftSelect.value||!rightSelect.value||leftSelect.value===rightSelect.value;
 }
-baseSelect.addEventListener("change",()=>{leftSelect.value="";rightSelect.value="";renderVersionOptions()});
-leftSelect.addEventListener("change",renderVersionOptions);
-rightSelect.addEventListener("change",renderVersionOptions);
+function clearComparison(){
+ comparedIds=null;conflictingPaths=[];selectedConflictChoices.clear();
+ mergeActions.hidden=true;mergeResult.hidden=true;mergeResult.replaceChildren();
+ summary.hidden=true;summary.replaceChildren();results.replaceChildren();
+}
+baseSelect.addEventListener("change",()=>{clearComparison();leftSelect.value="";rightSelect.value="";renderVersionOptions()});
+leftSelect.addEventListener("change",()=>{clearComparison();renderVersionOptions()});
+rightSelect.addEventListener("change",()=>{clearComparison();renderVersionOptions()});
 async function loadVersions(reset){
  if(fetching)return;
  fetching=true;refresh.disabled=true;more.disabled=true;
