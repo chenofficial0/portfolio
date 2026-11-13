@@ -99,3 +99,11 @@ Cloudflare Workers KV Free: 1 GB total storage/account, 25 MiB maximum value, 10
 - `backend/zero-cost-security.test.mjs` tests authorization, CSP, disabled gate, and page content; CI includes syntax check for the new module.
 - IMPORTANT: `/studio` is still fetched from existing public GitHub Pages; the comparison page is independently served by Worker and not linked from the deployed Content Studio. Do not enable or deploy this UI until version-list and selection safety are reviewed.
 - The two existing portraits and current public site remain untouched.
+
+## Selectable private revision history (development branch)
+- Added `backend/src/private-kv-revision-list.js` and authenticated `GET /api/draft/revisions?cursor=...` behind BOTH disabled gates (`ENABLE_IMMUTABLE_DRAFTS` and `ENABLE_REVISION_COMPARISON`).
+- Uses Workers KV `list` with a **30-entry page limit**, validates cursor and keys, reads/validates each referenced record and returns only revision metadata (`id`, `parentId`, `sha`, `createdAt`), not draft bodies. A stale/invalid page fails closed rather than silently implying complete history.
+- The UI `/studio/revisions` offers history refresh, pagination, original revision selection and two children sharing that original parent. Compare remains read-only. A missing or not-yet-replicated version can appear later; KV ordering does NOT imply newest or preferred content.
+- Added `backend/private-kv-revision-list.test.mjs` and authenticated Worker-level listing checks. CI workflow now runs them.
+- **No changes to deployed studio, no feature enablement, no migration, no merge/publish or media deletion.** There is no on-site link to this experimental page.
+- This is still a prototype: version list correctness under live KV replication, UI browser behavior and storage-budget/performance require acceptance tests. Do NOT enable for active use until reviewed.
