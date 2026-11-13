@@ -30,6 +30,7 @@ jobs:
           node --check backend/src/private-kv-draft.js
           node --check backend/src/private-kv-revisions.js
           node --check backend/src/private-kv-compare.js
+          node --check backend/src/revision-compare-page.js
       - name: Run isolated tests without external deployment
         run: |
           node backend/private-kv-media.test.mjs
