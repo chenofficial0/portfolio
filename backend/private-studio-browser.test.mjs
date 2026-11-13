@@ -13,7 +13,7 @@ const source=JSON.parse(await readFile(path.join(root,"content/site.json"),"utf8
 const rootId="R".repeat(32);
 const ids=[{id:rootId,parentId:null,createdAt:"2026-11-13T08:00:00Z"}];
 const snapshots=new Map([[rootId,source]]);
-let saves=0,reads=0,legacyWrites=0;
+let saves=0,reads=0,legacyWrites=0,reviewWrites=0,publicWrites=0;\nlet allowPublish=false;
 let allowPrivate=true;
 const server=http.createServer(async(req,res)=>{
  const url=new URL(req.url,"http://127.0.0.1");
@@ -24,7 +24,7 @@ const server=http.createServer(async(req,res)=>{
  }
  if(req.method==="GET"&&url.pathname==="/api/session"){
   json({authenticated:true,csrf:"test-csrf",login:"test-editor",
-    canSave:false,canPublish:false,canUpload:false,canUseImmutableStudio:allowPrivate});
+    canSave:false,canPublish:false,canUpload:false,canUseImmutableStudio:allowPrivate,canReviewPrivatePublish:allowPublish});
   return;
  }
  if(req.method==="GET"&&url.pathname==="/api/draft/revisions"){
@@ -45,6 +45,32 @@ const server=http.createServer(async(req,res)=>{
   snapshots.set(id,body.data);ids.push({id,parentId:body.parentId,createdAt:"2026-11-13T08:20:00Z"});
   json({id,parentId:body.parentId,immutable:true},201);return;
  }
+ if(req.method==="GET"&&url.pathname==="/api/publish/private-plan"){
+  if(!allowPublish)return json({error:"Disabled"},403);
+  const id=url.searchParams.get("revision");
+  return json({revisionId:id,mayWrite:false,published:false,
+    changedSections:["about"],media:[{source:"private-kv/chen-hero-2026-11-12-8tp6PGMB_zcRxazp.jpg",
+      publicPath:"assets/uploads/chen-hero-2026-11-12-8tp6PGMB_zcRxazp.jpg"}]});
+ }
+ if(req.method==="POST"&&url.pathname==="/api/publish/private-review"){
+  const parts=[];for await(const chunk of req)parts.push(chunk);
+  const body=JSON.parse(Buffer.concat(parts).toString("utf8"));
+  assert.equal(req.headers["x-chen-csrf"],"test-csrf");
+  assert.equal(body.confirmation,"REVIEW_PRIVATE_PUBLICATION");
+  assert.equal(body.revisionId,ids.at(-1).id);
+  reviewWrites++;
+  return json({reviewId:"P".repeat(43),revisionId:body.revisionId,
+    willExposePrivateMedia:true});
+ }
+ if(req.method==="POST"&&url.pathname==="/api/publish/private-confirm"){
+  const parts=[];for await(const chunk of req)parts.push(chunk);
+  const body=JSON.parse(Buffer.concat(parts).toString("utf8"));
+  assert.equal(body.confirmation,"PUBLISH_APPROVED_PRIVATE_REVISION");
+  assert.equal(body.mediaConfirmation,"I_APPROVE_PUBLIC_MEDIA");
+  assert.equal(body.reviewId,"P".repeat(43));
+  publicWrites++;
+  return json({published:true,commit:"b".repeat(40)});
+ }
  if(req.method==="PUT"&&url.pathname==="/api/content"){
   legacyWrites++;json({error:"Legacy writes are blocked"},403);return;
  }
@@ -57,7 +83,7 @@ try{
  browser=await chromium.launch();
  for(const [kind,options] of [["desktop",{viewport:{width:1366,height:900}}],
     ["mobile",{...devices["iPhone 13"],defaultBrowserType:undefined}]]){
-  const ctx=await browser.newContext(options);
+  allowPublish=kind==="desktop";\n  const ctx=await browser.newContext(options);
   const page=await ctx.newPage();
   const errors=[];page.on("pageerror",e=>errors.push(e.message));
   await page.goto(url+"/studio/private");
@@ -71,18 +97,34 @@ try{
   const about=page.locator(".field input").first();
   assert.ok(await about.isVisible(),"About editor must be editable");
   await about.fill(kind==="desktop"?"桌面測試":"手機測試");
-  page.on("dialog",dialog=>dialog.accept());
+  page.on("dialog",dialog=>dialog.type()==="prompt"?dialog.accept("PUBLISH APPROVED"):dialog.accept());
   await page.locator("#publish").click();
   await page.getByText(/新的私人草稿版本已儲存/).waitFor();
   assert.equal(await picker.inputValue(),ids.at(-1).id);
   assert.equal(await page.locator("#preview-site").isVisible(),true);
   assert.equal(await page.locator("#preview-site").isEnabled(),true);
-  assert.equal(await page.locator("#review-release").isVisible(),false);
+  assert.equal(await page.locator("#review-release").isVisible(),allowPublish);
+  if(allowPublish){
+    await page.locator("#review-release").click();
+    await page.getByText(/預計公開的私人檔案數：1/).waitFor();
+    const reviewAction=page.getByRole("button",{name:"建立發布審閱單"});
+    await reviewAction.click();
+    assert.equal(reviewWrites,0,"Cannot issue review without checked disclosure");
+    await page.locator(".release-check input[type=checkbox]").check();
+    await reviewAction.click();
+    await page.getByText(/已建立五分鐘有效的審閱單/).waitFor();
+    assert.equal(reviewWrites,1);
+    await page.getByRole("button",{name:"最終確認並公開發布"}).click();
+    await page.getByText(/已提交正式網站更新/).waitFor();
+    assert.equal(publicWrites,1);
+  }
   assert.deepEqual(errors,[]);
   console.log("PASS: "+kind+" private Studio selects a version and creates a NEW immutable draft.");
   await ctx.close();
  }
  assert.equal(saves,2);
+ assert.equal(reviewWrites,1);
+ assert.equal(publicWrites,1);
  assert.equal(legacyWrites,0);
  assert.ok(reads>=2);
  assert.deepEqual(snapshots.get(rootId),source,"Original snapshot must remain unchanged");
