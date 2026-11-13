@@ -68,3 +68,14 @@
 - Actual no-write live audit GitHub Actions **passed**: https://github.com/chenofficial0/portfolio/actions/runs/43425068891 . All checks are GET-only; no production write, deploy, or logged-in interaction was undertaken.
 - Caveat: no authenticated end-to-end live editor/photo preview/save/publish test has been run. Those remain pending and MUST NOT be reported as passed by the anonymous-only audit.
 - Google search result favicon may differ due to GitHub Pages project-path hostname limits and crawler behavior.
+
+## 2026-11-13 — Phase 20: real authenticated Studio readiness (read-only)
+
+- Split immutable private revision **read** capability from **write** capability with independently gated `ENABLE_IMMUTABLE_DRAFT_WRITES=false` (new explicit flag). API refuses append even when version history and authenticated private preview are enabled. UI hides private save unless `canAppendImmutableDraft` true.
+- Dedicated read-only Worker configuration `backend/wrangler-private-readonly.toml` enables only `ENABLE_IMMUTABLE_DRAFTS=true`, `ENABLE_REVISION_COMPARISON=true`, `ENABLE_PRIVATE_STUDIO=true`; **all private media writes, immutable draft appends, merge saves, public releases and rollback gates remain false**.
+- Unit, integration, desktop/mobile browser, readonly configuration and Worker dry-run tests passed: https://github.com/chenofficial0/portfolio/actions/runs/43426314755 .
+- Cloudflare version `6bdc091b-08a8-44d6-a418-4d94e5eb25a7` uploaded but not initially deployed; SDK API explicitly verified flags, KV bindings, OAuth secret bindings, and previous v85 traffic: https://github.com/chenofficial0/portfolio/actions/runs/43426737466 .
+- Activated only that audited **read-only** version with rollback to v85 on failed health checks: https://github.com/chenofficial0/portfolio/actions/runs/43427071544 . The deployment completed successfully, including public site, favicon, anonymous private route denial and OAuth login redirect.
+- Independent **live** Cloudflare version/deployment check confirmed new version serves 100% of traffic and private/public write flags remain OFF; private draft, photo preview and publish plans still reject anonymous callers. https://github.com/chenofficial0/portfolio/actions/runs/43427345415 .
+- **Next mandatory step requires user:** actual approved GitHub OAuth login to `https://chen-content-studio-api.clyichen0312.workers.dev/studio`, select the migrated immutable revision `DHHWj72Rf_MotkHDt7jdKSAEyhwIeUDO`, verify both photos and website preview. Do not ask user to share passwords, session cookies or OAuth tokens.
+- No private draft write, image upload, GitHub main content publication, source photo removal, or public photo history purge has occurred. **Do not claim private editor final publication completed.**
