@@ -48,4 +48,24 @@ await assert.rejects(planPrivateRevisionPublish({revisionId:rootId,data:hidden,l
 const empty=await planPrivateRevisionPublish({revisionId:rootId,data:base,liveData:base,validate:valid});
 assert.equal(empty.media.length,0);assert.equal(empty.willExposePrivateMedia,false);
 assert.deepEqual(empty.changedSections,[]);
+// Golden test: migrating the current two-photo draft to private KV and planning a
+// publication should reproduce the original public snapshot without any writes.
+const {readFile}=await import("node:fs/promises");
+const {fileURLToPath}=await import("node:url");
+const path=(await import("node:path")).default;
+const {buildPrivateMigrationBundle,EXPECTED_PUBLIC_ASSETS}=await import("./src/private-kv-migration-bundle.js");
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
+const publicSnapshot=JSON.parse(await readFile(path.join(root,"content/site.json"),"utf8"));
+const assetFiles=Object.fromEntries(await Promise.all(EXPECTED_PUBLIC_ASSETS.map(async spec=>[
+ spec.path,await readFile(path.join(root,spec.path))
+])));
+const migrated=buildPrivateMigrationBundle(publicSnapshot,assetFiles,{id:rootId});
+const actual=await planPrivateRevisionPublish({
+ revisionId:rootId,data:migrated.record.data,liveData:publicSnapshot,validate:valid
+});
+assert.deepEqual(actual.publicData,publicSnapshot);
+assert.equal(actual.media.length,2);
+assert.equal(actual.willExposePrivateMedia,true);
+assert.equal(actual.mayWrite,false);
+assert.equal(actual.published,false);
 console.log("PASS: private publication plan lists all media, rewrites only reviewed fields, detects privacy leaks and does not write.");
