@@ -29,3 +29,14 @@
 4. 使用者最後確認對外呈現內容後，才發布網站與宣布正式啟用。
 
 **禁止將 KV 遷移成功、隔離測試通過誤寫為已正式啟用。**
+
+## 2026-11-13 Worker inactive-version verification — VERIFIED
+
+- Owner configured `CLOUDFLARE_WORKER_EDITOR_TOKEN` as an account secret scoped to individual Worker `chen-content-studio-api`.
+- Initial `wrangler versions upload` reported successful upload, then exited with auth error 10000 when querying the account-level Workers subdomain endpoint. The command was **not re-run**.
+- Cloudflare official versions/deployments APIs read-only verification confirms uploaded **v84** ID `d27643da-8044-4861-b8c6-e55e14a6b28e`, while active production remains **v83** ID `da3650c4-7785-4e81-b5d6-71cb817e2da1` receiving **100% of traffic**.
+- Versions/deployments API result shape correction was made from `result.versions` to `result.items`, documented by Cloudflare API. Successful audit: https://github.com/chenofficial0/portfolio/actions/runs/43404382298 .
+- Further audited v84 `GET /versions/{id}` and current deployment using the existing scoped token: all private, publishing, draft and media features flagged off, both KV bindings match their original namespaces, and both existing GitHub OAuth/session encryption secret **binding names** are present. No secret values logged. Success: https://github.com/chenofficial0/portfolio/actions/runs/43404757950 .
+- New inactive-version audit remains read-only. **No production deployment or traffic switch occurred.**
+- Remaining mandatory release blocker: version-pinned private drafts must have a tested, explicit publishing flow with safe handling of private media before the new editor can become the production workflow. Currently immutable draft mode intentionally refuses legacy publish endpoints. Must additionally audit public photo exposure and Git history, live authenticated preview, login/rollback before production enablement.
+- **Do not blindly grant broader Cloudflare permissions or repeat Worker version upload.** Existing v84 is verified and ready for further controlled acceptance.
