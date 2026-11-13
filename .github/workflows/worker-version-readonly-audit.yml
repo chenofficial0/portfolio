@@ -1,0 +1,28 @@
+name: CHEN Worker Version & Deployment Read-Only Audit
+
+on:
+  push:
+    branches:
+      - feature/zero-cost-private-media
+    paths:
+      - "backend/TRIGGER_WORKER_VERSION_READONLY_AUDIT.md"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-current-worker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check audit script syntax
+        run: node --check backend/worker-version-readonly-audit.mjs
+      - name: Read version and active deployment IDs (no writes)
+        env:
+          CLOUDFLARE_WORKER_EDITOR_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_EDITOR_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node backend/worker-version-readonly-audit.mjs
