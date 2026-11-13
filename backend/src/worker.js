@@ -448,7 +448,7 @@ async function confirmPublish(request,session,env){
   if(refs.some(path=>PRIVATE_MEDIA_REF.test(path))){
     const uploaded=await github("/repos/"+REPO+"/git/blobs",session.token,{
       method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({content:JSON.stringify(published,null,2)+"\\n",encoding:"utf-8"})
+      body:JSON.stringify({content:JSON.stringify(published,null,2)+"\n",encoding:"utf-8"})
     });
     contentSha=uploaded.sha;
   }
