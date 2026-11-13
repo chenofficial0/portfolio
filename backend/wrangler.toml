@@ -1,0 +1,25 @@
+name = "chen-content-studio-api"
+main = "src/worker.js"
+compatibility_date = "2026-11-12"
+workers_dev = true
+
+# Fill in actual KV namespace ID before deploying.
+# Create it with: npx wrangler kv namespace create STUDIO_KV
+[[kv_namespaces]]
+binding = "STUDIO_KV"
+id = "f5115459b9a0488186850f92f1ee8cfc"
+
+[vars]
+# Only GitHub staging branch draft writes are allowed. The public website remains unchanged.
+ENABLE_CONTENT_WRITES = "false"
+ENABLE_MEDIA_UPLOADS = "true"
+ENABLE_DRAFT_SAVES = "true"
+# Release remains locked until staging preview and publish workflow pass acceptance checks.
+ENABLE_LIVE_PUBLISH = "false"
+# Must match the exact deployed API origin, e.g. https://chen-content-studio-api.YOUR-SUBDOMAIN.workers.dev
+PUBLIC_API_ORIGIN = "https://chen-content-studio-api.clyichen0312.workers.dev"
+GITHUB_CLIENT_ID = "Ov23lidWfrNSvOTLZnoC"
+
+# Secrets (set with wrangler secret put; NEVER commit them):
+# GITHUB_CLIENT_SECRET
+# SESSION_ENCRYPTION_KEY  (base64-encoded 32 random bytes)
