@@ -44,7 +44,7 @@ export async function storePrivateMedia(env, path, data) {
   if (!kv) throw new Error("PRIVATE_STORAGE_UNAVAILABLE");
   if (!validatePrivateMedia(path, data)) throw new Error("INVALID_PRIVATE_MEDIA");
   // A separate manifest/quota accounting step is required before enabling production writes.
-  await kv.put(path, data.slice().buffer);
+  await kv.put(path, data.slice().buffer, {metadata:{bytes:data.byteLength,kind:"private-media-v1"}});
   return { path, mime: mimeForPrivateMedia(path), bytes: data.byteLength };
 }
 export async function readPrivateMedia(env, path) {
