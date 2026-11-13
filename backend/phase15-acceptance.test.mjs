@@ -14,7 +14,7 @@ for(const key of [
  "ENABLE_CONTENT_WRITES","ENABLE_MEDIA_UPLOADS","ENABLE_PRIVATE_DRAFTS",
  "ENABLE_IMMUTABLE_DRAFTS","ENABLE_REVISION_COMPARISON","ENABLE_MERGE_SAVES",
  "ENABLE_KV_MEDIA_UPLOADS","ENABLE_KV_MEDIA_DELETES","ENABLE_LIVE_PUBLISH",
- "ENABLE_MIGRATION_AUDIT","ENABLE_PRIVATE_STUDIO","ENABLE_PRIVATE_PUBLISH_PLANS","ENABLE_PRIVATE_PUBLISH_CONFIRM"
+ "ENABLE_MIGRATION_AUDIT","ENABLE_PRIVATE_STUDIO","ENABLE_PRIVATE_PUBLISH_PLANS","ENABLE_PRIVATE_PUBLISH_CONFIRM","ENABLE_PRIVATE_ROLLBACK"
 ]){
  assert.equal(get(key),"false","Unsafe feature enabled without acceptance: "+key);
 }
@@ -40,7 +40,7 @@ assert.equal(namespaceValues.find(x=>x.binding==="PRIVATE_DRAFT_KV").id,
 const worker=await readFile(path.join(root,"backend/src/worker.js"),"utf8");
 for(const route of ["/api/content","/api/draft/revision","/api/draft/revisions",
  "/api/draft/compare","/api/draft/merge-preview","/api/draft/merge-save",
- "/api/media/private","/api/publish/confirm","/api/migration/readiness","/api/publish/private-plan","/api/publish/private-review","/api/publish/private-confirm","/studio/private"]){
+ "/api/media/private","/api/publish/confirm","/api/migration/readiness","/api/publish/private-plan","/api/publish/private-review","/api/publish/private-confirm","/api/publish/private-rollback-review","/api/publish/private-rollback-confirm","/studio/private"]){
  assert.ok(worker.includes(route),"Missing API route: "+route);
 }
 const html=await readFile(path.join(root,"backend/src/revision-compare-page.js"),"utf8");
