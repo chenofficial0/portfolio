@@ -57,7 +57,7 @@ button{background:#1d1d1c;color:white;border:1px solid #1d1d1c;padding:10px 23px
 <div class="controls"><button id="compare-button" type="submit" form="compare-form" disabled>比較版本</button><span role="status" aria-live="polite" class="status" id="status">請先讀取歷史版本並選擇兩份修改。</span></div>
 <section id="summary" class="summary" hidden aria-label="比較摘要"></section>
 <section id="results" aria-label="欄位差異"></section>
-<section id="merge-actions" class="merge-actions" hidden aria-label="合併預覽"><h2 style="font-size:14px;font-weight:500">人工選擇與合併預覽</h2><p class="small-note">所有衝突都必須指定 A 或 B。只產生預覽，不會儲存、發布或刪除照片。</p><button id="merge-preview-button" type="button" disabled>產生合併預覽</button><span id="merge-status" role="status" aria-live="polite" class="status"></span><div id="merge-result" class="merge-preview" hidden></div></section>
+<section id="merge-actions" class="merge-actions" hidden aria-label="合併預覽"><h2 style="font-size:14px;font-weight:500">人工選擇與合併預覽</h2><p class="small-note">所有衝突都必須指定 A 或 B。比較預覽不會寫入資料；若後端另行開放儲存，會再顯示獨立確認按鈕。網站正式發布仍然分開管制。</p><button id="merge-preview-button" type="button" disabled>產生合併預覽</button><span id="merge-status" role="status" aria-live="polite" class="status"></span><div id="merge-result" class="merge-preview" hidden></div><div id="save-merge-area" hidden><p class="small-note">已完整確認預覽內容後，可以另存為新的私人草稿版本。原始版本與 A／B 修改皆會保留。</p><button id="save-merge-button" type="button" disabled>確認另存為新草稿版本</button><span id="save-merge-status" role="status" aria-live="polite" class="status"></span></div></section>
 </main>
 <script nonce="__NONCE__">
 (function(){
@@ -71,6 +71,11 @@ const mergeActions=document.getElementById("merge-actions");
 const mergeButton=document.getElementById("merge-preview-button");
 const mergeStatus=document.getElementById("merge-status");
 const mergeResult=document.getElementById("merge-result");
+const saveArea=document.getElementById("save-merge-area");
+const saveButton=document.getElementById("save-merge-button");
+const saveStatus=document.getElementById("save-merge-status");
+let allowMergeSave=false;
+let confirmedPreview=null;
 const selectedConflictChoices=new Map();
 let comparedIds=null;
 let conflictingPaths=[];
@@ -107,7 +112,12 @@ function renderVersionOptions(){
  chooseOptions(rightSelect,children,"選擇版本 B");
  button.disabled=!baseSelect.value||!leftSelect.value||!rightSelect.value||leftSelect.value===rightSelect.value;
 }
+function invalidateSave(){
+ confirmedPreview=null;saveButton.disabled=true;
+ saveArea.hidden=true;saveStatus.textContent="";
+}
 function clearComparison(){
+ invalidateSave();
  comparedIds=null;conflictingPaths=[];selectedConflictChoices.clear();
  mergeActions.hidden=true;mergeResult.hidden=true;mergeResult.replaceChildren();
  summary.hidden=true;summary.replaceChildren();results.replaceChildren();
@@ -168,7 +178,7 @@ mergeButton.addEventListener("click",async()=>{
  const decisions=Object.create(null);
  for(const [path,side] of selectedConflictChoices)decisions[path]=side;
  mergeButton.disabled=true;mergeStatus.className="status";mergeStatus.textContent="正在產生唯讀合併預覽…";
- mergeResult.hidden=true;mergeResult.replaceChildren();
+ invalidateSave();mergeResult.hidden=true;mergeResult.replaceChildren();
  try{
   const response=await fetch("/api/draft/merge-preview",{
    method:"POST",credentials:"same-origin",cache:"no-store",
@@ -177,15 +187,44 @@ mergeButton.addEventListener("click",async()=>{
   });
   const data=await response.json();
   if(!response.ok)throw Error(data.error||"合併預覽失敗");
-  if(!data.ready||!data.merged||data.persisted!==false||data.published!==false)
+  if(!data.ready||!data.merged||data.persisted!==false||data.published!==false||
+     typeof data.previewDigest!=="string"||!/^[a-f0-9]{64}$/.test(data.previewDigest))
    throw Error("合併尚未完成或回應格式不正確");
   mergeResult.hidden=false;
   mergeResult.append(node("p","","合併預覽已產生，沒有寫入任何儲存位置。"));
   const preview=node("pre","",JSON.stringify(data.merged,null,2));
   mergeResult.append(preview);
   mergeStatus.textContent="預覽完成。資料尚未儲存。";
+  if(allowMergeSave){
+    confirmedPreview={base:comparedIds[0],left:comparedIds[1],right:comparedIds[2],
+      decisions,previewDigest:data.previewDigest};
+    saveArea.hidden=false;saveButton.disabled=false;
+  }
  }catch(error){mergeStatus.className="status error";mergeStatus.textContent="無法完成預覽："+error.message;}
  finally{refreshMergeButton();}
+});
+saveButton.addEventListener("click",async()=>{
+ if(!allowMergeSave||!confirmedPreview||saveButton.disabled)return;
+ if(!window.confirm("確定另存為全新的私人草稿版本？原始草稿和版本 A／B 都會保留，正式網站不會更新。"))return;
+ saveButton.disabled=true;saveStatus.className="status";saveStatus.textContent="正在另存新草稿版本…";
+ try{
+  const response=await fetch("/api/draft/merge-save",{
+    method:"POST",credentials:"same-origin",cache:"no-store",
+    headers:{"content-type":"application/json","x-chen-csrf":window.__comparisonCsrf||""},
+    body:JSON.stringify({...confirmedPreview,confirmation:"SAVE_MERGE_AS_NEW_REVISION"})
+  });
+  const result=await response.json();
+  if(!response.ok)throw Error(result.error||"儲存失敗");
+  if(!result.ok||!result.revision?.id||result.published!==false||
+     result.originalRevisionsPreserved!==true)throw Error("儲存回應格式不正確");
+  saveStatus.textContent="已另存全新草稿版本："+result.revision.id+"。正式網站未更新。";
+  confirmedPreview=null;
+  saveButton.disabled=true;
+ }catch(error){
+  saveStatus.className="status error";
+  saveStatus.textContent="無法儲存："+error.message+"。原始版本未被覆寫。";
+  saveButton.disabled=false;
+ }
 });
 async function loadCsrf(){
  try{
@@ -194,7 +233,8 @@ async function loadCsrf(){
   const session=await response.json();
   if(!session.authenticated||typeof session.csrf!=="string")throw Error("請先登入後台");
   window.__comparisonCsrf=session.csrf;
- }catch(_){window.__comparisonCsrf="";}
+  allowMergeSave=session.canSaveMerge===true;
+ }catch(_){window.__comparisonCsrf="";allowMergeSave=false;}
 }
 loadCsrf();
 form.addEventListener("submit",async event=>{
@@ -204,7 +244,7 @@ form.addEventListener("submit",async event=>{
   status.className="status error";status.textContent="請從版本清單選擇同一原始版本的兩份修改。";return;
  }
  summary.hidden=true;summary.replaceChildren();results.replaceChildren();
- mergeActions.hidden=true;mergeResult.hidden=true;mergeResult.replaceChildren();
+ invalidateSave();mergeActions.hidden=true;mergeResult.hidden=true;mergeResult.replaceChildren();
  comparedIds=null;conflictingPaths=[];selectedConflictChoices.clear();
  if(ids.some(id=>!idPattern.test(id))||new Set(ids).size!==3){
   status.className="status error";status.textContent="請輸入三個不同且有效的版本識別碼。";return;
@@ -244,7 +284,7 @@ form.addEventListener("submit",async event=>{
       input.addEventListener("change",()=>{
         selectedConflictChoices.set(change.path,side);
         mergeResult.hidden=true;mergeResult.replaceChildren();
-        refreshMergeButton();
+        invalidateSave();refreshMergeButton();
       });
       choice.append(input,node("span","",label));radios.append(choice);
     }
