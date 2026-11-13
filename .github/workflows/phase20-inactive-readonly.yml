@@ -1,0 +1,40 @@
+name: CHEN Phase 20 Inactive Read-Only Studio Candidate
+
+on:
+  push:
+    branches:
+      - feature/zero-cost-private-media
+    paths:
+      - "backend/TRIGGER_PHASE20_READONLY_UPLOAD.md"
+
+permissions:
+  contents: read
+
+jobs:
+  upload-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify read-only feature isolation
+        run: |
+          node backend/phase20-readonly-candidate.test.mjs
+          node backend/zero-cost-security.test.mjs
+          node --check backend/phase20-verify-inactive-readonly.mjs
+      - name: Build only; do not deploy
+        run: npx --yes wrangler@4.47.0 deploy --dry-run --config backend/wrangler-private-readonly.toml --outdir /tmp/chen-phase20-private-readonly
+      - name: Upload inactive read-only version only
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_EDITOR_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4.47.0 versions upload --config backend/wrangler-private-readonly.toml --message "CHEN phase 20 private Studio read-only candidate, all writes and publishing disabled"
+      - name: Verify uploaded version and unchanged live production traffic
+        env:
+          CLOUDFLARE_WORKER_EDITOR_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_EDITOR_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node backend/phase20-verify-inactive-readonly.mjs
