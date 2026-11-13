@@ -4,7 +4,7 @@
  * Publish only after registering a GitHub OAuth app, provisioning KV,
  * and setting Cloudflare Worker secrets documented in README.
  */
-import {validPrivateRef,readPrivateMedia} from "./private-kv-media.js";
+import {validPrivateRef,readPrivateMedia,deletePrivateMedia,privateKv} from "./private-kv-media.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -275,6 +275,29 @@ async function uploadResource(request,session,env){
     return json({ok:true,path,url:path,staging:true,private:true,mime:data.mime});
   }catch(_){return fail("Private document upload failed",502)}
 }
+// Explicit deletion only. Never automatically delete an image merely because a draft reference was removed.
+async function deletePrivateKvAsset(request,editor,env){
+  if(env.ENABLE_KV_MEDIA_DELETES!=="true")return fail("Private media deletion is disabled until acceptance",403);
+  if(request.headers.get("x-chen-csrf")!==editor.csrf)return fail("Invalid CSRF token",403);
+  if(!privateKv(env))return fail("Private KV media storage is not configured",503);
+  const body=await request.text();
+  if(body.length>2048)return fail("Delete request too large",413);
+  let input;try{input=JSON.parse(body)}catch(_){return fail("Invalid delete request",400)}
+  if(!input||!validPrivateRef(input.path)||input.confirmation!=="DELETE_PRIVATE_MEDIA")
+    return fail("Exact private media path and deletion confirmation required",422);
+  // The existing public draft source remains in use until private draft migration is accepted.
+  // Fail closed if content cannot be loaded or any text field still refers to this media.
+  let draft;
+  try{draft=await rawContent(editor,CONTENT_BRANCH)}catch(_){return fail("Unable to verify draft references",503)}
+  if(!draft||!validate(draft.data))return fail("Unable to validate current draft",503);
+  if(JSON.stringify(draft.data).includes(input.path))
+    return fail("Photo is still referenced by a draft; remove its reference and save first",409);
+  try{
+    const result=await deletePrivateMedia(env,input.path);
+    return json({accepted:result.accepted,globallyErased:false,
+      note:"KV deletion can take time to propagate across regions. This does not remove Git history or external copies."});
+  }catch(_){return fail("Private media deletion unavailable",503)}
+}
 const STAGED_IMAGE_PATH=/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg$/;
 async function readStagedAsset(session,relative,env){
   if(validPrivateRef(relative)){
@@ -533,6 +556,10 @@ export default {
         return confirmPublish(request,s,env);
       }
       if(method==="GET"&&path==="/api/media/preview")return previewStagedImage(request,s,env);
+      if(method==="DELETE"&&path==="/api/media/private"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return deletePrivateKvAsset(request,s,env);
+      }
       if(method==="POST"&&path==="/api/media/resource"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return uploadResource(request,s,env);
