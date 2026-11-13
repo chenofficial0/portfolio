@@ -37,6 +37,7 @@ jobs:
           node --check backend/src/private-kv-migration-audit.js
           node --check backend/src/cloudflare-remote-kv-audit.js
           node --check backend/src/private-kv-migration-bundle.js
+          node --check backend/phase17-live-kv-migrate.mjs
       - name: Run isolated tests without external deployment
         run: |
           node backend/private-kv-media.test.mjs
