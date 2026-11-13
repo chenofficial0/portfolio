@@ -7,6 +7,7 @@
 import {validPrivateRef,validatePrivateMedia,storePrivateMedia,readPrivateMedia,deletePrivateMedia,privateKv} from "./private-kv-media.js";
 import {readPrivateDraft} from "./private-kv-draft.js";
 import {appendRevision,readRevision,validRevisionId} from "./private-kv-revisions.js";
+import {compareThreeWay} from "./private-kv-compare.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -242,6 +243,25 @@ async function appendImmutableDraftRevision(request,session,env){
     if(err.message==="PARENT_REVISION_UNAVAILABLE")return fail("Parent revision is unavailable; no data saved",409);
     return fail("Private revision storage unavailable",503);
   }
+}
+// Three-way comparison is read-only; never writes or selects a winning revision.
+async function compareImmutableDraftRevisions(request,env){
+  if(env.ENABLE_REVISION_COMPARISON!=="true"||env.ENABLE_IMMUTABLE_DRAFTS!=="true")
+    return fail("Draft comparison is not enabled",403);
+  const params=new URL(request.url).searchParams;
+  const ids=["base","left","right"].map(key=>params.get(key));
+  if(ids.some(id=>!validRevisionId(id))||new Set(ids).size!==3)
+    return fail("Three distinct valid revision identifiers are required",400);
+  let docs;
+  try{docs=await Promise.all(ids.map(id=>readRevision(env,id,{validate})))}
+  catch(_){return fail("Private revision comparison unavailable",503)}
+  if(docs.some(doc=>!doc))return fail("One or more revisions were not found",404);
+  const [base,left,right]=docs;
+  // Only siblings with the same immediate parent are supported.
+  if(left.parentId!==base.id||right.parentId!==base.id)
+    return fail("Revisions must share the selected immediate parent",409);
+  try{return json({base:base.id,left:left.id,right:right.id,...compareThreeWay(base.data,left.data,right.data)})}
+  catch(_){return fail("Comparison is too complex or invalid",422)}
 }
 // New media stays in a private R2 bucket; absent binding must fail closed.
 const PRIVATE_MEDIA_REF=/^private-media\/chen-(?:hero|profile|gallery|work-cover|work-still|resource)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.(?:jpg|png|pdf)$/;
@@ -643,6 +663,7 @@ export default {
       if(!s)return fail("Sign in with approved GitHub account",401);
       if(method==="GET"&&path==="/api/content")return getContent(s,env);
       if(method==="GET"&&path==="/api/draft/revision")return getImmutableDraftRevision(request,env);
+      if(method==="GET"&&path==="/api/draft/compare")return compareImmutableDraftRevisions(request,env);
       if(method==="POST"&&path==="/api/draft/revision"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return appendImmutableDraftRevision(request,s,env);
