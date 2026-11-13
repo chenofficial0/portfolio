@@ -172,6 +172,30 @@ assert.deepEqual((await (await request(revisionUrl(desktopId))).json()).data,des
 assert.deepEqual((await (await request(revisionUrl(mobileId))).json()).data,mobile);
 assert.deepEqual((await (await request(revisionUrl(rootRevision.id))).json()).data,validDraft);
 assert.equal((await worker.fetch(new Request(origin+revisionUrl(rootRevision.id)),env)).status,401);
+// Private full-site preview is explicitly gated and never offers an anonymous draft.
+const privatePreviewPath="/api/preview/private-content?revision="+rootRevision.id;
+assert.equal((await request(privatePreviewPath)).status,403);
+env.ENABLE_PRIVATE_STUDIO="true";
+const privatePreview=await request(privatePreviewPath);
+assert.equal(privatePreview.status,200);
+assert.deepEqual(await privatePreview.json(),validDraft);
+assert.equal((await request("/api/preview/private-content?revision=bad")).status,400);
+assert.equal((await worker.fetch(new Request(origin+privatePreviewPath),env)).status,401);
+const mediaDraft={...validDraft,
+  about:{hero_images:[{image:"private-kv/chen-hero-2026-11-12-8tp6PGMB_zcRxazp.jpg"}]},
+  profile:{photo:"private-kv/chen-profile-2026-11-12-mragG3nnw0NgdAUw.jpg"}};
+const photoResult=await request("/api/draft/revision","POST",revisionHeaders,
+  JSON.stringify({parentId:rootRevision.id,data:mediaDraft}));
+assert.equal(photoResult.status,201);
+const photoId=(await photoResult.json()).id;
+const photoPreview=await request("/api/preview/private-content?revision="+photoId);
+assert.equal(photoPreview.status,200);
+const displayed=await photoPreview.json();
+assert.equal(displayed.about.hero_images[0].image,
+ "/api/media/preview?path="+encodeURIComponent(mediaDraft.about.hero_images[0].image));
+assert.equal(displayed.profile.photo,
+ "/api/media/preview?path="+encodeURIComponent(mediaDraft.profile.photo));
+delete env.ENABLE_PRIVATE_STUDIO;
 env.ENABLE_REVISION_COMPARISON="true";
 // The private comparison UI is protected by the same login and feature flags.
 const comparisonPage=await request("/studio/revisions");
