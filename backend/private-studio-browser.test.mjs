@@ -13,7 +13,8 @@ const source=JSON.parse(await readFile(path.join(root,"content/site.json"),"utf8
 const rootId="R".repeat(32);
 const ids=[{id:rootId,parentId:null,createdAt:"2026-11-13T08:00:00Z"}];
 const snapshots=new Map([[rootId,source]]);
-let saves=0,reads=0,legacyWrites=0,reviewWrites=0,publicWrites=0;\nlet allowPublish=false;
+let saves=0,reads=0,legacyWrites=0,reviewWrites=0,publicWrites=0;
+let allowPublish=false;
 let allowPrivate=true;
 const server=http.createServer(async(req,res)=>{
  const url=new URL(req.url,"http://127.0.0.1");
@@ -83,7 +84,8 @@ try{
  browser=await chromium.launch();
  for(const [kind,options] of [["desktop",{viewport:{width:1366,height:900}}],
     ["mobile",{...devices["iPhone 13"],defaultBrowserType:undefined}]]){
-  allowPublish=kind==="desktop";\n  const ctx=await browser.newContext(options);
+  allowPublish=kind==="desktop";
+  const ctx=await browser.newContext(options);
   const page=await ctx.newPage();
   const errors=[];page.on("pageerror",e=>errors.push(e.message));
   await page.goto(url+"/studio/private");
