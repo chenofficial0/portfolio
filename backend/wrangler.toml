@@ -29,6 +29,7 @@ ENABLE_MERGE_SAVES = "false"
 ENABLE_MIGRATION_AUDIT = "false"
 ENABLE_PRIVATE_STUDIO = "false"
 ENABLE_PRIVATE_PUBLISH_PLANS = "false"
+ENABLE_PRIVATE_PUBLISH_CONFIRM = "false"
 ENABLE_KV_MEDIA_UPLOADS = "false"
 ENABLE_KV_MEDIA_DELETES = "false"
 # Release remains locked until staging preview and publish workflow pass acceptance checks.
