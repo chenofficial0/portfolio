@@ -8,6 +8,7 @@ import {validPrivateRef,validatePrivateMedia,storePrivateMedia,readPrivateMedia,
 import {readPrivateDraft} from "./private-kv-draft.js";
 import {appendRevision,readRevision,validRevisionId} from "./private-kv-revisions.js";
 import {compareThreeWay} from "./private-kv-compare.js";
+import {previewConflictResolution} from "./private-kv-merge-preview.js";
 import {revisionComparisonHtml} from "./revision-compare-page.js";
 import {listDraftRevisions} from "./private-kv-revision-list.js";
 const REPO="chenofficial0/portfolio";
@@ -275,6 +276,35 @@ async function compareImmutableDraftRevisions(request,env){
     return fail("Revisions must share the selected immediate parent",409);
   try{return json({base:base.id,left:left.id,right:right.id,...compareThreeWay(base.data,left.data,right.data)})}
   catch(_){return fail("Comparison is too complex or invalid",422)}
+}
+// Preview-only manual conflict resolution; never commit a merged result.
+async function previewImmutableMerge(request,session,env){
+  if(env.ENABLE_REVISION_COMPARISON!=="true"||env.ENABLE_IMMUTABLE_DRAFTS!=="true")
+    return fail("Conflict resolution preview is not enabled",403);
+  if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
+  if(Number(request.headers.get("content-length")||0)>12000)return fail("Merge selection too large",413);
+  const raw=await request.text();
+  if(raw.length>12000)return fail("Merge selection too large",413);
+  let input;try{input=JSON.parse(raw)}catch(_){return fail("Invalid merge preview JSON",400)}
+  if(!input||!["base","left","right"].every(key=>validRevisionId(input[key]))||
+     new Set([input.base,input.left,input.right]).size!==3||
+     !input.decisions||typeof input.decisions!=="object"||Array.isArray(input.decisions))
+    return fail("Invalid revision selection",422);
+  let revisions;
+  try{revisions=await Promise.all([input.base,input.left,input.right].map(id=>readRevision(env,id,{validate})))}
+  catch(_){return fail("Private revision storage unavailable",503)}
+  if(revisions.some(r=>!r))return fail("One or more revisions not found",404);
+  const [base,left,right]=revisions;
+  if(left.parentId!==base.id||right.parentId!==base.id)
+    return fail("Revisions must share their direct parent",409);
+  try{
+    const result=previewConflictResolution(base.data,left.data,right.data,input.decisions,validate);
+    return json({base:base.id,left:left.id,right:right.id,...result});
+  }catch(err){
+    if(["INVALID_MERGE_DECISION","INVALID_MERGE_DECISIONS","MERGE_RESULT_INVALID"].includes(err.message))
+      return fail("Invalid or incomplete conflict resolution selection",422);
+    return fail("Merge preview unavailable",503);
+  }
 }
 // New media stays in a private R2 bucket; absent binding must fail closed.
 const PRIVATE_MEDIA_REF=/^private-media\/chen-(?:hero|profile|gallery|work-cover|work-still|resource)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.(?:jpg|png|pdf)$/;
@@ -691,6 +721,10 @@ export default {
       if(method==="GET"&&path==="/api/draft/revision")return getImmutableDraftRevision(request,env);
       if(method==="GET"&&path==="/api/draft/revisions")return listImmutableDraftRevisions(request,env);
       if(method==="GET"&&path==="/api/draft/compare")return compareImmutableDraftRevisions(request,env);
+      if(method==="POST"&&path==="/api/draft/merge-preview"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return previewImmutableMerge(request,s,env);
+      }
       if(method==="POST"&&path==="/api/draft/revision"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return appendImmutableDraftRevision(request,s,env);
