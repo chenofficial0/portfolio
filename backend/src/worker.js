@@ -12,6 +12,7 @@ import {previewConflictResolution} from "./private-kv-merge-preview.js";
 import {resolveSelectedMerge,saveReviewedMerge} from "./private-kv-merge-save.js";
 import {revisionComparisonHtml} from "./revision-compare-page.js";
 import {listDraftRevisions} from "./private-kv-revision-list.js";
+import {auditPrivateNamespace} from "./private-kv-migration-audit.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -247,6 +248,12 @@ async function appendImmutableDraftRevision(request,session,env){
     if(err.message==="PARENT_REVISION_UNAVAILABLE")return fail("Parent revision is unavailable; no data saved",409);
     return fail("Private revision storage unavailable",503);
   }
+}
+// Authenticated read-only diagnostics; disabled unless explicitly enabled in a reviewed deployment.
+async function checkPrivateMigrationReadiness(env){
+  if(env.ENABLE_MIGRATION_AUDIT!=="true")return fail("Private migration diagnostics disabled",403);
+  try{return json(await auditPrivateNamespace(env))}
+  catch(_){return fail("Private migration diagnostics unavailable; no fallback",503)}
 }
 // Read-only private revision list. No latest revision assumptions or public fallback.
 async function listImmutableDraftRevisions(request,env){
@@ -742,6 +749,7 @@ export default {
       }
       if(method==="GET"&&path==="/api/content")return getContent(s,env);
       if(method==="GET"&&path==="/api/draft/revision")return getImmutableDraftRevision(request,env);
+      if(method==="GET"&&path==="/api/migration/readiness")return checkPrivateMigrationReadiness(env);
       if(method==="GET"&&path==="/api/draft/revisions")return listImmutableDraftRevisions(request,env);
       if(method==="GET"&&path==="/api/draft/compare")return compareImmutableDraftRevisions(request,env);
       if(method==="POST"&&path==="/api/draft/merge-preview"){
