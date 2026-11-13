@@ -105,4 +105,15 @@ assert.equal((await request("/api/media/preview?path=private-kv%2F..%2Fbad")).st
 delete env.PRIVATE_DRAFT_KV;
 assert.equal((await request(previewUrl)).status, 404);
 
+// Opted-in private draft mode must NEVER fall back to public GitHub on missing storage.
+env.ENABLE_PRIVATE_DRAFTS = "true";
+assert.equal((await request("/api/content")).status, 503);
+assert.equal((await request("/api/preview-content")).status, 503);
+assert.equal((await request("/api/publish/plan")).status, 403);
+assert.equal((await request("/api/publish/confirm","POST",
+  {origin, "x-chen-csrf":"test-csrf-only"},"{}")).status,403);
+assert.equal((await request("/api/content","PUT",
+  {origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"},"{}")).status,422);
+delete env.ENABLE_PRIVATE_DRAFTS;
+
 console.log("PASS: session flags, editor auth, wrong origin, missing CSRF, live publish disabled, media uploads disabled, anonymous reads denied.");
