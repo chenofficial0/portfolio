@@ -702,8 +702,11 @@ async function confirmPublish(request,session,env){
   }catch(err){return fail("Another update may have occurred; check GitHub before retrying",409)}
 }
 
-async function studio(env){
-  const upstream=await fetch(PUBLIC_STUDIO,{headers:{"Cache-Control":"no-cache"}});
+async function studio(env,privatePreview=false){
+  const source=privatePreview
+    ?"https://raw.githubusercontent.com/chenofficial0/portfolio/feature/zero-cost-private-media/admin/studio.html"
+    :PUBLIC_STUDIO;
+  const upstream=await fetch(source,{headers:{"Cache-Control":"no-cache"}});
   if(!upstream.ok)return fail("Studio page has not deployed yet",503);
   const html=await upstream.text();
   // Hosted under the API's own origin, enabling same-site HttpOnly cookies.
@@ -721,6 +724,14 @@ export default {
       const url=new URL(request.url),path=url.pathname,method=request.method;
       absoluteBase(request,env);
       if(method==="GET"&&path==="/studio")return studio(env);
+      if(method==="GET"&&path==="/studio/private"){
+        if(env.ENABLE_PRIVATE_STUDIO!=="true"||env.ENABLE_IMMUTABLE_DRAFTS!=="true"||
+           env.ENABLE_REVISION_COMPARISON!=="true"||env.ENABLE_DRAFT_SAVES!=="true")
+          return fail("Private editor preview is not enabled",403);
+        const editor=await session(request,env);
+        if(!editor)return fail("Sign in with approved GitHub account",401);
+        return studio(env,true);
+      }
       if(method==="GET"&&path==="/")return Response.redirect(env.PUBLIC_API_ORIGIN+"/studio",302);
       if(method==="GET"&&path==="/auth/login")return auth(request,env);
       if(method==="GET"&&path==="/auth/callback")return callback(request,env);
