@@ -1,6 +1,6 @@
 # CHEN. Zero-cost private media — implementation gate
 
-Status: isolated design branch only. NOT deployed; no production or staging branch behavior changed.
+Status: isolated development branch; read-only authenticated KV preview integration committed to Worker source. NOT deployed; no production or staging branch behavior changed.
 
 ## Non-negotiable constraints
 - Use existing Workers Free and Workers KV Free; do not enable R2, billing, paid storage, or automatic paid upgrades.
@@ -21,9 +21,9 @@ Status: isolated design branch only. NOT deployed; no production or staging bran
 - Use a private, separately protected backup/export process before destructive maintenance; do not place backups in public GitHub.
 
 ## Integration gates (not yet done)
-1. Implement independent, tested blob store module and explicit per-user permission checks in Worker.
+1. Private KV blob adapter and authenticated preview route are now linked in development code; execute tests before calling them verified. Upload/delete routes are NOT enabled. Session and existing preview endpoint gate reads.
 2. Ensure existing R2-only private media routes stay disabled until the KV implementation and tests pass.
-3. Update draft reference validation and publishing plan for a new `private-kv/` prefix; never fall back to a public GitHub upload.
+3. Private KV draft references are recognized and mapped to authenticated preview; private-KV publish plans and confirmations are explicitly rejected pending a separately reviewed release implementation. Never fall back to public GitHub upload.
 4. Add tests for unauthenticated access, origin, CSRF, upload MIME and magic bytes, size, deletion semantics, stale reads and quota failure modes.
 5. Test in a local/emulated Worker and isolated namespace; inspect production and preview environment variables before deploying.
 6. Confirm real billing plan is Workers Free, no R2 subscription, no optional pay-as-you-go feature.
@@ -34,3 +34,15 @@ Cloudflare Workers KV Free: 1 GB total storage/account, 25 MiB maximum value, 10
 - https://developers.cloudflare.com/kv/platform/limits/
 - https://developers.cloudflare.com/kv/platform/pricing/
 - https://developers.cloudflare.com/kv/concepts/how-kv-works/
+
+## Implemented in isolated branch (2026-11-13)
+- `backend/src/private-kv-media.js`: independent store, read and delete primitives; not wired to upload/delete routes.
+- `backend/src/worker.js`: `private-kv/` draft validation, authenticated private photo preview, explicit private-KV release lock. Legacy staged photos remain readable by existing path.
+- `backend/zero-cost-security.test.mjs`: added authenticated KV preview and fail-closed checks. Tests have **not been executed**; commits do not equal passing test results.
+- Cloudflare is not provisioned with `PRIVATE_DRAFT_KV`, and no deployed Worker has been updated.
+
+### Remaining blockers before any upload activation
+- No race-safe aggregate capacity enforcement yet; do not enable private KV writes with this adapter alone.
+- Need draft lifecycle, deletion confirmation, orphan detection and cleanup policy.
+- Need local test execution and complete permission, MIME, path, billing and concurrency verification.
+- Need explicit user acceptance before any Worker or website deployment.
