@@ -14,7 +14,7 @@ for(const key of [
  "ENABLE_CONTENT_WRITES","ENABLE_MEDIA_UPLOADS","ENABLE_PRIVATE_DRAFTS",
  "ENABLE_IMMUTABLE_DRAFTS","ENABLE_REVISION_COMPARISON","ENABLE_MERGE_SAVES",
  "ENABLE_KV_MEDIA_UPLOADS","ENABLE_KV_MEDIA_DELETES","ENABLE_LIVE_PUBLISH",
- "ENABLE_MIGRATION_AUDIT"
+ "ENABLE_MIGRATION_AUDIT","ENABLE_PRIVATE_STUDIO"
 ]){
  assert.equal(get(key),"false","Unsafe feature enabled without acceptance: "+key);
 }
@@ -40,11 +40,17 @@ assert.equal(namespaceValues.find(x=>x.binding==="PRIVATE_DRAFT_KV").id,
 const worker=await readFile(path.join(root,"backend/src/worker.js"),"utf8");
 for(const route of ["/api/content","/api/draft/revision","/api/draft/revisions",
  "/api/draft/compare","/api/draft/merge-preview","/api/draft/merge-save",
- "/api/media/private","/api/publish/confirm","/api/migration/readiness"]){
+ "/api/media/private","/api/publish/confirm","/api/migration/readiness","/studio/private"]){
  assert.ok(worker.includes(route),"Missing API route: "+route);
 }
 const html=await readFile(path.join(root,"backend/src/revision-compare-page.js"),"utf8");
 assert.ok(html.includes("window.confirm"),"Merge requires direct confirmation");
 assert.ok(html.includes("canSaveMerge"),"Merge UI must be gated by session");
 assert.ok(html.includes("same-origin"),"Requests must use same-origin credential mode");
+const stagedStudio=await readFile(path.join(root,"admin/studio.html"),"utf8");
+assert.match(stagedStudio,/private-revision-picker/);
+assert.match(stagedStudio,/canUseImmutableStudio/);
+assert.match(stagedStudio,/api\/draft\/revision/);
+assert.match(stagedStudio,/api\/draft\/revisions/);
+assert.match(stagedStudio,/privateRevisionId/);
 console.log("PASS: all live/publish/media/private/merge flags remain disabled and consent gates are present.");
