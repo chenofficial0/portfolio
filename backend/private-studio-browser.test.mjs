@@ -75,7 +75,8 @@ try{
   await page.locator("#publish").click();
   await page.getByText(/新的私人草稿版本已儲存/).waitFor();
   assert.equal(await picker.inputValue(),ids.at(-1).id);
-  assert.equal(await page.locator("#preview-site").isVisible(),false);
+  assert.equal(await page.locator("#preview-site").isVisible(),true);
+  assert.equal(await page.locator("#preview-site").isEnabled(),true);
   assert.equal(await page.locator("#review-release").isVisible(),false);
   assert.deepEqual(errors,[]);
   console.log("PASS: "+kind+" private Studio selects a version and creates a NEW immutable draft.");
