@@ -1,0 +1,37 @@
+name: CHEN Zero-Cost Backend Tests
+
+on:
+  push:
+    branches:
+      - feature/zero-cost-private-media
+    paths:
+      - "backend/**"
+      - ".github/workflows/zero-cost-backend-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify module syntax
+        run: |
+          node --check backend/src/worker.js
+          node --check backend/src/private-kv-media.js
+          node --check backend/src/private-kv-draft.js
+          node --check backend/src/private-kv-revisions.js
+      - name: Run isolated tests without external deployment
+        run: |
+          node backend/private-kv-media.test.mjs
+          node backend/private-kv-draft.test.mjs
+          node backend/private-kv-revisions.test.mjs
+          node backend/zero-cost-security.test.mjs
