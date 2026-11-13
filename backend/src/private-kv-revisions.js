@@ -6,9 +6,10 @@ const MAX_BYTES = 192 * 1024;
 const VALID_ID = /^[A-Za-z0-9_-]{32,64}$/;
 const encoder = new TextEncoder();
 
-function store(env) {
+function store(env,requireWrite=false) {
   const kv=env?.PRIVATE_DRAFT_KV;
-  return kv && typeof kv.get==="function" && typeof kv.put==="function" ? kv : null;
+  return kv && typeof kv.get==="function" &&
+    (!requireWrite || typeof kv.put==="function") ? kv : null;
 }
 function randomId() {
   const bytes=crypto.getRandomValues(new Uint8Array(24));
@@ -42,7 +43,7 @@ export async function readRevision(env,id,{validate}={}) {
   return record;
 }
 export async function appendRevision(env,{data,parentId=null,validate}) {
-  const kv=store(env);
+  const kv=store(env,true);
   if(!kv)throw Error("REVISION_STORE_UNAVAILABLE");
   if(typeof validate!=="function"||!validate(data))throw Error("REVISION_INVALID");
   if(parentId!==null&&!validRevisionId(parentId))throw Error("INVALID_PARENT_REVISION");
