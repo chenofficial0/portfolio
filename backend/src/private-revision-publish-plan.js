@@ -22,7 +22,7 @@ function walk(current,path,mapping){
   if(["__proto__","constructor","prototype"].includes(k))throw Error("UNSAFE_CONTENT_KEY");
   const p=path+"/"+k.replace(/~/g,"~0").replace(/\//g,"~1");
   if(typeof v==="string"&&PRIVATE_ANY.test(v)){
-   if(!MEDIA_FIELDS.has(k))throw Error("PRIVATE_REF_IN_UNRECOGNIZED_FIELD");
+   if(!MEDIA_FIELDS.has(k)&&!(k==="url"&&/^\\/profile\\/links\\/\\d+\\/url$/.test(p))&&!(k==="showreel_url"&&p==="/profile/showreel_url"))throw Error("PRIVATE_REF_IN_UNRECOGNIZED_FIELD");
    if(!PRIVATE_MEDIA.test(v))throw Error("INVALID_PRIVATE_MEDIA_REFERENCE");
    const target=PUBLIC_ORIGIN+v.replace(/^private-kv\//,"assets/uploads/");
    if(!PUBLIC_MEDIA.test(target.slice(PUBLIC_ORIGIN.length)))throw Error("INVALID_PUBLIC_MEDIA_DESTINATION");
