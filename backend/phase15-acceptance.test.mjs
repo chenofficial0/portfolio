@@ -18,6 +18,24 @@ for(const key of [
  assert.equal(get(key),"false","Unsafe feature enabled without acceptance: "+key);
 }
 assert.equal(get("ENABLE_DRAFT_SAVES"),"true");
+// The original session storage and new PRIVATE_DRAFT_KV must be distinct.
+const namespaceBlocks=[...toml.matchAll(/\[\[kv_namespaces\]\]([\s\S]*?)(?=\[\[kv_namespaces\]\]|\[vars\]|$)/g)];
+assert.equal(namespaceBlocks.length,2,"Expected exactly two KV namespace bindings");
+const namespaceValues=namespaceBlocks.map(([,body])=>{
+ const binding=body.match(/^binding = "([A-Z_]+)"$/m)?.[1];
+ const id=body.match(/^id = "([a-f0-9]{32})"$/m)?.[1];
+ assert.ok(binding&&id,"Invalid KV namespace block");
+ return {binding,id};
+});
+assert.deepEqual(new Set(namespaceValues.map(x=>x.binding)),
+ new Set(["STUDIO_KV","PRIVATE_DRAFT_KV"]));
+assert.equal(new Set(namespaceValues.map(x=>x.id)).size,2,
+ "Private media/draft KV must not share session storage");
+assert.equal(namespaceValues.find(x=>x.binding==="STUDIO_KV").id,
+ "f5115459b9a0488186850f92f1ee8cfc");
+assert.equal(namespaceValues.find(x=>x.binding==="PRIVATE_DRAFT_KV").id,
+ "aad4672cc5474625b8fc0f070e75bc99");
+
 const worker=await readFile(path.join(root,"backend/src/worker.js"),"utf8");
 for(const route of ["/api/content","/api/draft/revision","/api/draft/revisions",
  "/api/draft/compare","/api/draft/merge-preview","/api/draft/merge-save",
