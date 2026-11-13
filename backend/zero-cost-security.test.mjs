@@ -192,6 +192,15 @@ assert.equal((await worker.fetch(new Request(origin+revisionUrl(rootRevision.id)
 const privatePreviewPath="/api/preview/private-content?revision="+rootRevision.id;
 assert.equal((await request(privatePreviewPath)).status,403);
 env.ENABLE_PRIVATE_STUDIO="true";
+env.ENABLE_REVISION_COMPARISON="true";
+env.ENABLE_IMMUTABLE_DRAFT_WRITES="false";
+const readOnlyCapabilities=await (await request("/api/session")).json();
+assert.equal(readOnlyCapabilities.canUseImmutableStudio,true);
+assert.equal(readOnlyCapabilities.canAppendImmutableDraft,false);
+assert.equal((await request("/api/draft/revision","POST",revisionHeaders,
+ JSON.stringify({parentId:rootRevision.id,data:validDraft}))).status,403);
+assert.equal((await request("/api/draft/revisions")).status,200);
+env.ENABLE_IMMUTABLE_DRAFT_WRITES="true";
 const privatePreview=await request(privatePreviewPath);
 assert.equal(privatePreview.status,200);
 assert.deepEqual(await privatePreview.json(),validDraft);
