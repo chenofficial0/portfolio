@@ -13,6 +13,7 @@ import {resolveSelectedMerge,saveReviewedMerge} from "./private-kv-merge-save.js
 import {revisionComparisonHtml} from "./revision-compare-page.js";
 import {listDraftRevisions} from "./private-kv-revision-list.js";
 import {auditPrivateNamespace} from "./private-kv-migration-audit.js";
+import {planPrivateRevisionPublish} from "./private-revision-publish-plan.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -652,6 +653,31 @@ async function previewImmutableRevisionSite(request,env){
     "content-security-policy":"default-src 'none'; script-src 'nonce-"+nonce+"'; style-src 'nonce-"+nonce+"'; style-src-attr 'unsafe-inline'; connect-src 'self'; img-src 'self' data: https:; font-src 'self'; frame-src https:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
   }});
 }
+// Read-only disclosure review for one exact immutable revision.
+// No release approval key is minted here; no GitHub or KV writes are permitted.
+async function planImmutablePrivatePublish(request,session,env){
+  if(env.ENABLE_PRIVATE_PUBLISH_PLANS!=="true"||
+     env.ENABLE_PRIVATE_STUDIO!=="true"||
+     env.ENABLE_IMMUTABLE_DRAFTS!=="true")
+    return fail("Private publish review is disabled",403);
+  const id=new URL(request.url).searchParams.get("revision");
+  if(!validRevisionId(id))return fail("Invalid private revision selection",400);
+  let revision,live;
+  try{
+    [revision,live]=await Promise.all([
+      readRevision(env,id,{validate}),rawContent(session,"main")
+    ]);
+  }catch(_){return fail("Private revision or public site unavailable",503)}
+  if(!revision||!live||!validate(live.data))return fail("Private revision or live site unavailable",404);
+  try{
+    const plan=await planPrivateRevisionPublish({
+      revisionId:id,data:revision.data,liveData:live.data,validate
+    });
+    // Publication plan is always a non-actionable preview. It cannot authorize publishing.
+    const {publicData,...summary}=plan;
+    return json({...summary,releaseEnabled:false});
+  }catch(_){return fail("Private release plan rejected unreviewed content or media",422)}
+}
 async function preparePublish(session,env){
   if(env.ENABLE_IMMUTABLE_DRAFTS==="true")return fail("Private revision release requires separate reviewed publish workflow",403);
   if(env.ENABLE_PRIVATE_DRAFTS==="true")return fail("Publishing private drafts is locked pending migration review",403);
@@ -830,6 +856,7 @@ export default {
       if(method==="GET"&&path==="/preview/private")return previewImmutableRevisionSite(request,env);
       if(method==="GET"&&path==="/api/preview/private-content")return previewImmutableRevisionData(request,env);
       if(method==="GET"&&path==="/api/preview-content")return previewContent(s,env);
+      if(method==="GET"&&path==="/api/publish/private-plan")return planImmutablePrivatePublish(request,s,env);
       if(method==="GET"&&path==="/api/publish/plan")return preparePublish(s,env);
       if(method==="POST"&&path==="/api/publish/confirm"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
