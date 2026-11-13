@@ -55,3 +55,15 @@ Cloudflare Workers KV Free: 1 GB total storage/account, 25 MiB maximum value, 10
 - No UI delete controls have been wired. Do not enable upload or deletion flags yet.
 - All changes remain exclusively on `feature/zero-cost-private-media`; never merge or deploy without tests and explicit review.
 - Isolated test files have been updated but have **not been executed**.
+
+## Private draft isolation — development implementation (2026-11-13)
+- New `backend/src/private-kv-draft.js` supports explicit one-time initialization, read, validation, bounded JSON writes, SHA-256 content revision and stale-version refusal.
+- Worker `GET /api/content`, `PUT /api/content`, and `GET /api/preview-content` use private KV *only* when `ENABLE_PRIVATE_DRAFTS=true`; missing private data causes a 503 with **no public GitHub fallback**.
+- When private draft mode is enabled, both release planning and release confirmation fail closed. Publication from the private draft will need a separate, audited design.
+- Private media deletion checks references in whichever draft backend is active.
+- `backend/wrangler.toml` on this isolated branch defaults `ENABLE_PRIVATE_DRAFTS=false`, `ENABLE_MEDIA_UPLOADS=false`, `ENABLE_KV_MEDIA_UPLOADS=false`, `ENABLE_KV_MEDIA_DELETES=false`. Do not change these settings in a live environment now.
+- Existing GitHub staged data and the two portraits are NOT migrated or deleted by this commit.
+- Important: KV revisions are NOT atomic compare-and-swap. Concurrent editor sessions may overwrite each other despite SHA checks. Before enabling writes, implement a serialized writes layer (for example a free-tier-supported transactional service after verifying pricing) or another safely constrained design. Single editor credentials alone do not eliminate multiple-device concurrency.
+- Private draft data should not be initialized automatically from a publicly accessible Git branch. Migration needs explicit review of exact source, export, destination, backup, image references and rollback.
+- Existing public Git commits remain publicly accessible; moving newer copies to private KV does not erase historical exposure.
+- Tests `backend/private-kv-draft.test.mjs`, `backend/private-kv-media.test.mjs`, and `backend/zero-cost-security.test.mjs` have been created but not run on this branch. Environment couldn't download repo sources for a local test, so treat results as UNVERIFIED.
