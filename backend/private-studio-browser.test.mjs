@@ -15,6 +15,7 @@ const ids=[{id:rootId,parentId:null,createdAt:"2026-11-13T08:00:00Z"}];
 const snapshots=new Map([[rootId,source]]);
 let saves=0,reads=0,legacyWrites=0,reviewWrites=0,publicWrites=0,rollbackWrites=0;
 let allowPublish=false;
+let allowAppend=true;
 let allowPrivate=true;
 const server=http.createServer(async(req,res)=>{
  const url=new URL(req.url,"http://127.0.0.1");
@@ -25,7 +26,7 @@ const server=http.createServer(async(req,res)=>{
  }
  if(req.method==="GET"&&url.pathname==="/api/session"){
   json({authenticated:true,csrf:"test-csrf",login:"test-editor",
-    canSave:false,canPublish:false,canUpload:false,canUseImmutableStudio:allowPrivate,canReviewPrivatePublish:allowPublish,canRollbackPrivatePublish:allowPublish});
+    canSave:false,canPublish:false,canUpload:false,canUseImmutableStudio:allowPrivate,canAppendImmutableDraft:allowAppend,canReviewPrivatePublish:allowPublish,canRollbackPrivatePublish:allowPublish});
   return;
  }
  if(req.method==="GET"&&url.pathname==="/api/draft/revisions"){
@@ -145,6 +146,21 @@ try{
   console.log("PASS: "+kind+" private Studio selects a version and creates a NEW immutable draft.");
   await ctx.close();
  }
+ // Private version read-only mode: editor and preview remain available, save is hidden.
+ allowAppend=false;allowPublish=false;
+ const readonly=await browser.newContext({viewport:{width:980,height:760}});
+ const readonlyPage=await readonly.newPage();
+ await readonlyPage.goto(url+"/studio/private");
+ const readonlyPicker=readonlyPage.locator("#private-revision-picker");
+ await readonlyPicker.waitFor({state:"visible"});
+ await readonlyPicker.selectOption(rootId);
+ await readonlyPage.getByText(/已選擇私人草稿版本/).waitFor();
+ assert.equal(await readonlyPage.locator("#publish").isVisible(),false);
+ assert.equal(await readonlyPage.locator("#preview-site").isVisible(),true);
+ assert.equal(await readonlyPage.locator("#preview-site").isEnabled(),true);
+ assert.equal(await readonlyPage.locator("#review-release").isVisible(),false);
+ await readonly.close();
+ console.log("PASS: private Studio read-only mode allows selected revision preview but hides saving and public release.");
  assert.equal(saves,2);
  assert.equal(reviewWrites,1);
  assert.equal(publicWrites,1);
