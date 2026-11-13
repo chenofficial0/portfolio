@@ -91,3 +91,11 @@ Cloudflare Workers KV Free: 1 GB total storage/account, 25 MiB maximum value, 10
 - Scalar preview text is truncated to 240 characters in the response; read-only API results are still private information and must never be cached publicly.
 - Next: explicit visual conflict selection UX and safe identity-based handling of filmography/gallery records. Never auto-merge arrays or release without acceptance.
 - CI includes `backend/private-kv-compare.test.mjs` and Worker-level authorized comparison regression cases. Review the run for the latest commit before calling it passed.
+
+## Revision comparison UI (isolated feature branch)
+- Added `backend/src/revision-compare-page.js`, a responsive, read-only Traditional Chinese interface matching CHEN. Content Studio's monochrome visual language. It displays the original, desktop A and mobile B values with conflict labels. HTML is built without injected draft markup, and all response text is rendered using DOM `textContent`.
+- Added authenticated `GET /studio/revisions`, gated by `ENABLE_IMMUTABLE_DRAFTS=true` and `ENABLE_REVISION_COMPARISON=true`, both still disabled in wrangler configuration; page uses a per-request CSP nonce, `Cache-Control: private, no-store`, framing restriction and referrer protection.
+- UI currently requires three opaque revision IDs; no revision discovery/list, no winner selection, no automatic merge, no delete, no publish, no actual deployment.
+- `backend/zero-cost-security.test.mjs` tests authorization, CSP, disabled gate, and page content; CI includes syntax check for the new module.
+- IMPORTANT: `/studio` is still fetched from existing public GitHub Pages; the comparison page is independently served by Worker and not linked from the deployed Content Studio. Do not enable or deploy this UI until version-list and selection safety are reviewed.
+- The two existing portraits and current public site remain untouched.
