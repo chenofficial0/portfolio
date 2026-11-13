@@ -743,7 +743,7 @@ export default {
         r.headers.append("set-cookie",cookie("chen_session","",0));return r;
       }
       const s=await session(request,env);
-      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_LIVE_PUBLISH==="true",canSave:env.ENABLE_DRAFT_SAVES==="true"&&env.ENABLE_PRIVATE_DRAFTS!=="true"&&env.ENABLE_IMMUTABLE_DRAFTS!=="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true",canSaveMerge:env.ENABLE_MERGE_SAVES==="true"&&env.ENABLE_IMMUTABLE_DRAFTS==="true"&&env.ENABLE_REVISION_COMPARISON==="true"}:{authenticated:false,canPublish:false,canSave:false,canUpload:false,canSaveMerge:false});
+      if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_LIVE_PUBLISH==="true",canSave:env.ENABLE_DRAFT_SAVES==="true"&&env.ENABLE_PRIVATE_DRAFTS!=="true"&&env.ENABLE_IMMUTABLE_DRAFTS!=="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true",canSaveMerge:env.ENABLE_MERGE_SAVES==="true"&&env.ENABLE_IMMUTABLE_DRAFTS==="true"&&env.ENABLE_REVISION_COMPARISON==="true",canUseImmutableStudio:env.ENABLE_PRIVATE_STUDIO==="true"&&env.ENABLE_IMMUTABLE_DRAFTS==="true"&&env.ENABLE_REVISION_COMPARISON==="true"&&env.ENABLE_DRAFT_SAVES==="true"}:{authenticated:false,canPublish:false,canSave:false,canUpload:false,canSaveMerge:false,canUseImmutableStudio:false});
       if(!s)return fail("Sign in with approved GitHub account",401);
       if(method==="GET"&&path==="/studio/revisions"){
         if(env.ENABLE_REVISION_COMPARISON!=="true"||env.ENABLE_IMMUTABLE_DRAFTS!=="true")
