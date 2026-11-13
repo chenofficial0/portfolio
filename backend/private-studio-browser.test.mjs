@@ -13,7 +13,7 @@ const source=JSON.parse(await readFile(path.join(root,"content/site.json"),"utf8
 const rootId="R".repeat(32);
 const ids=[{id:rootId,parentId:null,createdAt:"2026-11-13T08:00:00Z"}];
 const snapshots=new Map([[rootId,source]]);
-let saves=0,reads=0,legacyWrites=0,reviewWrites=0,publicWrites=0;
+let saves=0,reads=0,legacyWrites=0,reviewWrites=0,publicWrites=0,rollbackWrites=0;
 let allowPublish=false;
 let allowPrivate=true;
 const server=http.createServer(async(req,res)=>{
@@ -25,7 +25,7 @@ const server=http.createServer(async(req,res)=>{
  }
  if(req.method==="GET"&&url.pathname==="/api/session"){
   json({authenticated:true,csrf:"test-csrf",login:"test-editor",
-    canSave:false,canPublish:false,canUpload:false,canUseImmutableStudio:allowPrivate,canReviewPrivatePublish:allowPublish});
+    canSave:false,canPublish:false,canUpload:false,canUseImmutableStudio:allowPrivate,canReviewPrivatePublish:allowPublish,canRollbackPrivatePublish:allowPublish});
   return;
  }
  if(req.method==="GET"&&url.pathname==="/api/draft/revisions"){
@@ -72,6 +72,22 @@ const server=http.createServer(async(req,res)=>{
   publicWrites++;
   return json({published:true,commit:"b".repeat(40)});
  }
+ if(req.method==="POST"&&url.pathname==="/api/publish/private-rollback-review"){
+  const chunks=[];for await(const chunk of req)chunks.push(chunk);
+  const body=JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  assert.equal(body.confirmation,"REVIEW_PUBLIC_SITE_ROLLBACK");
+  assert.equal(body.publishedCommit,"b".repeat(40));
+  return json({reviewId:"Q".repeat(43),publishedCommit:body.publishedCommit,
+    previousPublicationHistoryMayRemainPublic:true});
+ }
+ if(req.method==="POST"&&url.pathname==="/api/publish/private-rollback-confirm"){
+  const chunks=[];for await(const chunk of req)chunks.push(chunk);
+  const body=JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  assert.equal(body.reviewId,"Q".repeat(43));
+  assert.equal(body.confirmation,"RESTORE_PREVIOUS_PUBLIC_SITE");
+  rollbackWrites++;
+  return json({restored:true,commit:"c".repeat(40),priorMediaMayRemainPublic:true});
+ }
  if(req.method==="PUT"&&url.pathname==="/api/content"){
   legacyWrites++;json({error:"Legacy writes are blocked"},403);return;
  }
@@ -99,7 +115,9 @@ try{
   const about=page.locator(".field input").first();
   assert.ok(await about.isVisible(),"About editor must be editable");
   await about.fill(kind==="desktop"?"桌面測試":"手機測試");
-  page.on("dialog",dialog=>dialog.type()==="prompt"?dialog.accept("PUBLISH APPROVED"):dialog.accept());
+  page.on("dialog",dialog=>dialog.type()==="prompt"
+    ?dialog.accept(dialog.message().includes("RESTORE PUBLIC SITE")?"RESTORE PUBLIC SITE":"PUBLISH APPROVED")
+    :dialog.accept());
   await page.locator("#publish").click();
   await page.getByText(/新的私人草稿版本已儲存/).waitFor();
   assert.equal(await picker.inputValue(),ids.at(-1).id);
@@ -119,6 +137,10 @@ try{
     await page.getByRole("button",{name:"最終確認並公開發布"}).click();
     await page.getByText(/已提交正式網站更新/).waitFor();
     assert.equal(publicWrites,1);
+ assert.equal(rollbackWrites,1);
+    await page.getByRole("button",{name:"還原這次正式發布"}).click();
+    await page.getByText(/網站內容已提交還原/).waitFor();
+    assert.equal(rollbackWrites,1);
   }
   assert.deepEqual(errors,[]);
   console.log("PASS: "+kind+" private Studio selects a version and creates a NEW immutable draft.");
