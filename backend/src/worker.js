@@ -111,7 +111,7 @@ function validate(d){
     for(const item of d.profile.links){
       if(item.kind!==undefined&&!["url","pdf","jpg","png"].includes(item.kind))return false;
       if(!item||typeof item!=="object"||Array.isArray(item)||!safeString(item.label,80)||!safeString(item.url,2048))return false;
-      if(item.url&&!item.url.startsWith("https://"))return false;
+      if(item.url&&!item.url.startsWith("https://")&&!PRIVATE_MEDIA_REF.test(item.url))return false;
       if(item.url&&!validURL(item.url))return false;
     }
   }
