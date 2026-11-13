@@ -4,6 +4,7 @@
  * Publish only after registering a GitHub OAuth app, provisioning KV,
  * and setting Cloudflare Worker secrets documented in README.
  */
+import {validPrivateRef,readPrivateMedia} from "./private-kv-media.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -75,6 +76,7 @@ function validURL(value){
   if(!value)return true;
   if(!safeString(value,2048))return false;
   if(value.startsWith("private-media/"))return PRIVATE_MEDIA_REF.test(value);
+  if(value.startsWith("private-kv/"))return validPrivateRef(value);
   if(value.startsWith("/portfolio/assets/uploads/")||value.startsWith("assets/uploads/"))return !value.includes("..");
   try{const u=new URL(value);return u.protocol==="https:"&&!u.username&&!u.password}catch(_){return false}
 }
@@ -111,7 +113,7 @@ function validate(d){
     for(const item of d.profile.links){
       if(item.kind!==undefined&&!["url","pdf","jpg","png"].includes(item.kind))return false;
       if(!item||typeof item!=="object"||Array.isArray(item)||!safeString(item.label,80)||!safeString(item.url,2048))return false;
-      if(item.url&&!item.url.startsWith("https://")&&!PRIVATE_MEDIA_REF.test(item.url))return false;
+      if(item.url&&!item.url.startsWith("https://")&&!PRIVATE_MEDIA_REF.test(item.url)&&!validPrivateRef(item.url))return false;
       if(item.url&&!validURL(item.url))return false;
     }
   }
@@ -275,6 +277,11 @@ async function uploadResource(request,session,env){
 }
 const STAGED_IMAGE_PATH=/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-still)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.jpg$/;
 async function readStagedAsset(session,relative,env){
+  if(validPrivateRef(relative)){
+    const asset=await readPrivateMedia(env,relative);
+    if(!asset)throw Error("Private KV media not found");
+    return {bytes:asset.bytes,private:true,kv:true};
+  }
   if(PRIVATE_MEDIA_REF.test(relative)){
     const bucket=privateBucket(env);
     if(!bucket)throw Error("Private media storage unavailable");
@@ -298,7 +305,7 @@ async function readStagedAsset(session,relative,env){
 }
 async function previewStagedImage(request,session,env){
   const relative=new URL(request.url).searchParams.get("path")||"";
-  if(!PRIVATE_MEDIA_REF.test(relative)&&!STAGED_IMAGE_PATH.test(relative)&&!RESOURCE_REF.test(relative))return fail("Invalid staged media path",400);
+  if(!validPrivateRef(relative)&&!PRIVATE_MEDIA_REF.test(relative)&&!STAGED_IMAGE_PATH.test(relative)&&!RESOURCE_REF.test(relative))return fail("Invalid staged media path",400);
   try{
     const media=await readStagedAsset(session,relative,env);
     return new Response(media.bytes,{headers:{"content-type":mediaMime(relative),"cache-control":"private, no-store","x-content-type-options":"nosniff","content-disposition":"inline"}});
@@ -311,7 +318,7 @@ const IMAGE_REF=/^assets\/uploads\/chen-(?:hero|profile|gallery|work-cover|work-
 const PREVIEW_HTML="https://chenofficial0.github.io/portfolio/";
 function stagedPath(value){
   if(typeof value!=="string")return null;
-  if(PRIVATE_MEDIA_REF.test(value))return value;
+  if(PRIVATE_MEDIA_REF.test(value)||validPrivateRef(value))return value;
   if(!value.startsWith(IMAGE_URL_PREFIX))return null;
   const path=value.slice(IMAGE_URL_PREFIX.length);
   return IMAGE_REF.test(path)||RESOURCE_REF.test(path)?path:null;
@@ -398,6 +405,7 @@ async function preparePublish(session,env){
   if(Array.isArray(draft.data.about.hero_images)&&(draft.data.about.hero_image||draft.data.about.hero_image_secondary))
     return fail("Remove legacy hero photo fields from draft before publishing",422);
   const staged=imageRefs(draft.data);
+  if(staged.some(validPrivateRef))return fail("Private KV media publishing is locked pending separate release acceptance",403);
   if(staged.length>120)return fail("Too many media files to publish at once",422);
   for(const path of staged){
     try{await readStagedAsset(session,path,env)}catch(_){return fail("Staged file is unavailable or invalid: "+path,422)}
@@ -433,6 +441,7 @@ async function confirmPublish(request,session,env){
   if(Array.isArray(draft.data.about.hero_images)&&(draft.data.about.hero_image||draft.data.about.hero_image_secondary))
     return fail("Remove legacy hero photo fields before publishing",422);
   const refs=imageRefs(draft.data);
+  if(refs.some(validPrivateRef))return fail("Private KV media publishing has not been approved",403);
   if(refs.length!==plan.media.length||refs.some((p,i)=>p!==plan.media[i]))return fail("Image list changed; review again",409);
   const published=JSON.parse(JSON.stringify(draft.data));
   const replacePrivate=value=>PRIVATE_MEDIA_REF.test(value||"")?IMAGE_URL_PREFIX+publicMediaPath(value):value;
