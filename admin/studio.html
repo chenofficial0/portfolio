@@ -229,6 +229,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
   window.addEventListener("pagehide",()=>{for(const url of activePhotoURLs)URL.revokeObjectURL(url);activePhotoURLs.clear()});
   function stagedImagePreviewURL(url){
     if(!isWorkerHost||!apiSession||typeof url!=="string")return "";
+    if(/^private-media\/chen-(?:hero|profile|gallery|work-cover|work-still|resource)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.(?:jpg|png|pdf)$/.test(url))return "/api/media/preview?path="+encodeURIComponent(url);
     try{
       const parsed=new URL(url);
       if(parsed.hostname!=="chenofficial0.github.io")return "";
@@ -249,8 +250,8 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     const upload=btn("上傳照片",async()=>{
       const entry=localPhotos.get(obj)?.get(key);
       if(!entry||!apiSession?.canUpload)return;
-      if(!confirm("確定上傳照片？照片將寫入公開 GitHub 儲存庫的測試分支，但不會立刻顯示於正式網站。請確認擁有公開使用權。"))return;
-      upload.disabled=true;status.textContent="正在將照片儲存至 GitHub 測試分支…";
+      if(!confirm("確定上傳照片？照片會存至私人暫存空間，不會立刻公開。正式發布前仍請確認擁有使用權。"))return;
+      upload.disabled=true;status.textContent="正在將照片儲存至私人暫存空間…";
       try{
         const base64=await new Promise((resolve,reject)=>{
           const reader=new FileReader();
@@ -268,12 +269,12 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
         if(!response.ok)throw Error(result.error||"圖片上傳失敗");
         obj[key]=result.url;pathInput.value=result.url;entry.uploaded=true;
         markDirty();showPhoto();
-        status.textContent="已儲存至 GitHub 測試分支，尚未更新正式網站。請在發布功能啟用後，確認內容再發布。";
+        status.textContent="照片已儲存至私人暫存空間；請再儲存草稿，正式網站尚未更新。";
       }catch(err){status.textContent="上傳失敗："+err.message}
       finally{upload.disabled=!apiSession?.canUpload||!localPhotos.get(obj)?.get(key)}
     },"btn dark");
     upload.disabled=true;
-    upload.title=apiSession?.canUpload?"上傳至 GitHub 測試分支":"安全上傳功能尚未啟用";
+    upload.title=apiSession?.canUpload?"上傳至私人暫存空間":"安全上傳功能尚未啟用";
     const status=el("div","upload-status","目前僅支援本機預覽，尚未上傳 GitHub；請勿將預覽當作已儲存。");
     const pathInput=document.createElement("input");
     pathInput.type="text";pathInput.value=obj[key]||"";
@@ -282,8 +283,8 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     const hint=el("small","","JPG / PNG / WebP，原檔上限 10 MB。選取後自動產生壓縮預覽，不會直接修改網站。");
     function showPhoto(){
       const local=localPhotos.get(obj)?.get(key);
-      if(local){preview.src=local.url;preview.hidden=false;status.textContent=local.uploaded?"已上傳測試分支，尚待正式發布。":"本機照片已選擇並壓縮（"+(local.blob.size/1024).toFixed(0)+" KB）。尚未上傳；切換編輯區域仍可預覽，重新整理後會消失。"}
-      else if(obj[key]){preview.src=stagedImagePreviewURL(obj[key])||obj[key];preview.hidden=false;status.textContent="目前顯示已設定的圖片網址。測試分支照片透過登入後的預覽服務讀取，尚未發布至正式網站。"}
+      if(local){preview.src=local.url;preview.hidden=false;status.textContent=local.uploaded?"已上傳私人暫存空間，尚待正式發布。":"本機照片已選擇並壓縮（"+(local.blob.size/1024).toFixed(0)+" KB）。尚未上傳；切換編輯區域仍可預覽，重新整理後會消失。"}
+      else if(obj[key]){preview.src=stagedImagePreviewURL(obj[key])||obj[key];preview.hidden=false;status.textContent="目前顯示已設定的圖片網址。照片透過登入後的預覽服務讀取，尚未發布至正式網站。"}
       else{preview.removeAttribute("src");preview.hidden=true;status.textContent="尚未選取照片。本機預覽不會自動儲存或發布。"}
     }
     showPhoto();
@@ -477,7 +478,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
       const status=el("small","",item.url?"目前已設定檔案（可重新上傳）":"尚未選取檔案");
       const upload=btn("上傳檔案至測試分支",async()=>{
         const file=stagedResourceFiles.get(item);if(!file||!apiSession?.canUpload)return;
-        if(!confirm("測試分支屬於公開 GitHub 儲存庫，上傳後可能被他人讀取。確認已取得公開權利並上傳？"))return;
+        if(!confirm("附件會存至非公開暫存空間，正式發布後才會公開。確認上傳？"))return;
         upload.disabled=true;status.textContent="上傳中…";
         try{
           const base64=await new Promise((resolve,reject)=>{
@@ -758,7 +759,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
         if(session.authenticated){
           apiSession=session;
           publish.hidden=!session.canSave;logout.hidden=false;previewButton.hidden=false;reviewButton.hidden=false;
-          notice.textContent="已透過 GitHub 登入："+session.login+"。"+(session.canSave?"已開放儲存至 GitHub 測試分支。測試照片會存於公開儲存庫，但不會立即顯示於正式網站。":"目前為安全測試模式：尚未開放儲存草稿。可編輯及匯出 JSON 備份。");
+          notice.textContent="已透過 GitHub 登入："+session.login+"。"+(session.canSave?"已開放儲存至 GitHub 測試分支。新上傳照片需要已設定私人儲存空間，否則後端會拒絕上傳。":"目前為安全測試模式：尚未開放儲存草稿。可編輯及匯出 JSON 備份。");
           const contentResponse=await fetch("/api/content",{credentials:"same-origin",cache:"no-store"});
           if(!contentResponse.ok)throw Error("無法讀取網站的最新資料");
           const payload=await contentResponse.json();data=norm(payload.data);contentSha=payload.sha;
