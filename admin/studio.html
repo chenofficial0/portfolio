@@ -827,6 +827,32 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
                 if(saved.published!==true||!saved.commit)throw Error("未取得已確認的 GitHub 提交");
                 reviewPanel.replaceChildren(el("h2","","已提交正式網站更新"),
                   el("p","","GitHub Commit："+saved.commit+"。請檢查正式網站是否完成更新。"));
+                if(apiSession?.canRollbackPrivatePublish===true){
+                  reviewPanel.append(btn("還原這次正式發布",async()=>{
+                    if(!confirm("還原將建立新的 GitHub 提交，恢復先前的公開頁面。但曾公開的照片可能仍留在 Git 歷史。繼續嗎？"))return;
+                    try{
+                      const r=await privateFetch("/api/publish/private-rollback-review",{
+                        method:"POST",headers:{"content-type":"application/json",
+                          "x-chen-csrf":apiSession.csrf},
+                        body:JSON.stringify({publishedCommit:saved.commit,
+                          confirmation:"REVIEW_PUBLIC_SITE_ROLLBACK"})
+                      });
+                      if(!r.reviewId||r.publishedCommit!==saved.commit)throw Error("還原審閱單無效");
+                      if(prompt("請輸入 RESTORE PUBLIC SITE（含空格、英文大寫）以確認還原：")!=="RESTORE PUBLIC SITE")return;
+                      const done=await privateFetch("/api/publish/private-rollback-confirm",{
+                        method:"POST",headers:{"content-type":"application/json",
+                          "x-chen-csrf":apiSession.csrf},
+                        body:JSON.stringify({reviewId:r.reviewId,
+                          confirmation:"RESTORE_PREVIOUS_PUBLIC_SITE"})
+                      });
+                      if(done.restored!==true||!done.commit)throw Error("無法確認還原提交");
+                      reviewPanel.replaceChildren(el("h2","","網站內容已提交還原"),
+                        el("p","","還原 GitHub Commit："+done.commit+"。公開 Git 歷史中仍可能留有先前發布的照片。"));
+                    }catch(err){
+                      reviewPanel.append(el("p","","還原尚未確認："+err.message+"。請先查看 GitHub main，再決定是否重試。"));
+                    }
+                  },"btn"));
+                }
               }catch(err){
                 status.textContent="發布未確認："+err.message+"。請先檢查 GitHub main 的最新提交，不要直接重試。";
               }
