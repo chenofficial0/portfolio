@@ -22,6 +22,8 @@ const report={base,left,right,
 };
 let latestDecision=null;
 let reads=0;
+let saveEnabled=false;
+let saveRequests=0;
 const server=http.createServer(async(req,res)=>{
  const url=new URL(req.url,"http://127.0.0.1");
  const json=(body,status=200)=>{
@@ -33,7 +35,7 @@ const server=http.createServer(async(req,res)=>{
    res.end(revisionComparisonHtml("testnonce0123456789"));return;
  }
  if(req.method==="GET"&&url.pathname==="/api/session"){
-   json({authenticated:true,csrf:"test-csrf",canSaveMerge:false});return;
+   json({authenticated:true,csrf:"test-csrf",canSaveMerge:saveEnabled});return;
  }
  if(req.method==="GET"&&url.pathname==="/api/draft/revisions"){
    reads++;json({revisions:records,nextCursor:null,complete:true});return;
@@ -53,6 +55,16 @@ const server=http.createServer(async(req,res)=>{
      profile:{},works:[],gallery:[],contact:{}},
      persisted:false,published:false,previewDigest:"d".repeat(64)});return;
  }
+ if(req.method==="POST"&&url.pathname==="/api/draft/merge-save"){
+   const parts=[];for await(const part of req)parts.push(part);
+   const input=JSON.parse(Buffer.concat(parts).toString("utf8"));
+   assert.equal(input.confirmation,"SAVE_MERGE_AS_NEW_REVISION");
+   assert.equal(input.previewDigest,"d".repeat(64));
+   assert.equal(req.headers["x-chen-csrf"],"test-csrf");
+   saveRequests++;
+   json({ok:true,revision:{id:"D".repeat(32)},published:false,
+     originalRevisionsPreserved:true,alreadySaved:false});return;
+ }
  json({error:"Unsupported test route"},404);
 });
 await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
@@ -64,6 +76,7 @@ try{
    ["desktop",{viewport:{width:1366,height:900}}],
    ["mobile",{...devices["iPhone 13"],defaultBrowserType:undefined}]
  ]){
+   saveEnabled=mode==="desktop";
    const context=await browser.newContext(contextOptions);
    const page=await context.newPage();
    const errors=[];
@@ -82,7 +95,14 @@ try{
    await page.getByRole("button",{name:"產生合併預覽"}).click();
    await page.getByText("合併預覽已產生，沒有寫入任何儲存位置。").waitFor();
    assert.equal(latestDecision,"left");
-   assert.equal(await page.locator("#save-merge-area").isVisible(),false);
+   assert.equal(await page.locator("#save-merge-area").isVisible(),saveEnabled);
+   if(saveEnabled){
+     page.on("dialog",dialog=>dialog.accept());
+     await page.getByRole("button",{name:"確認另存為新草稿版本"}).click();
+     await page.getByText(/已另存全新草稿版本/).waitFor();
+     assert.equal(saveRequests,1);
+     assert.equal(await page.getByRole("button",{name:"確認另存為新草稿版本"}).isDisabled(),true);
+   }
    const metrics=await page.evaluate(()=>({
      documentWidth:document.documentElement.scrollWidth,viewportWidth:window.innerWidth
    }));
