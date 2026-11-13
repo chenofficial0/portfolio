@@ -35,18 +35,31 @@ export async function readRevision(env,id,{validate}={}) {
   if(!record||record.schema!==1||record.id!==id ||
     !validRevisionId(record.parentId) && record.parentId!==null ||
     !/^[a-f0-9]{64}$/.test(record.sha||"") ||
-    typeof record.data!=="object" || record.data===null)
+    typeof record.data!=="object" || record.data===null ||
+    (record.mergeSources!==undefined&&(!record.mergeSources ||
+      typeof record.mergeSources!=="object"||
+      !validRevisionId(record.mergeSources.left)||
+      !validRevisionId(record.mergeSources.right)||
+      record.mergeSources.left===record.mergeSources.right ||
+      record.mergeSources.left===record.parentId||
+      record.mergeSources.right===record.parentId)))
     throw Error("REVISION_CORRUPT");
   const canonical=JSON.stringify(record.data);
   if(await hash(canonical)!==record.sha)throw Error("REVISION_CORRUPT");
   if(typeof validate==="function"&&!validate(record.data))throw Error("REVISION_INVALID");
   return record;
 }
-export async function appendRevision(env,{data,parentId=null,validate}) {
+export async function appendRevision(env,{data,parentId=null,validate,mergeSources=null}) {
   const kv=store(env,true);
   if(!kv)throw Error("REVISION_STORE_UNAVAILABLE");
   if(typeof validate!=="function"||!validate(data))throw Error("REVISION_INVALID");
   if(parentId!==null&&!validRevisionId(parentId))throw Error("INVALID_PARENT_REVISION");
+  if(mergeSources!==null&&(
+    !mergeSources||typeof mergeSources!=="object"||Array.isArray(mergeSources)||
+    !validRevisionId(mergeSources.left)||!validRevisionId(mergeSources.right)||
+    mergeSources.left===mergeSources.right||mergeSources.left===parentId||
+    mergeSources.right===parentId||parentId===null))
+    throw Error("INVALID_MERGE_SOURCES");
   const canonical=JSON.stringify(data);
   if(encoder.encode(canonical).length>MAX_BYTES)throw Error("REVISION_TOO_LARGE");
   if(parentId!==null) {
@@ -58,7 +71,8 @@ export async function appendRevision(env,{data,parentId=null,validate}) {
   // KV does NOT ensure atomic uniqueness or instant cross-region visibility.
   if(await kv.get(PREFIX+id)!==null)throw Error("REVISION_COLLISION");
   const record={
-    schema:1,id,parentId,sha:await hash(canonical),createdAt:new Date().toISOString(),data
+    schema:1,id,parentId,sha:await hash(canonical),createdAt:new Date().toISOString(),data,
+    ...(mergeSources?{mergeSources:{left:mergeSources.left,right:mergeSources.right}}:{})
   };
   await kv.put(PREFIX+id,JSON.stringify(record));
   return {id,parentId,sha:record.sha,createdAt:record.createdAt,immutable:true};
