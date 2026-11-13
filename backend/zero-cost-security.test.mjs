@@ -316,6 +316,17 @@ assert.equal((await request("/api/draft/revisions")).status,403);
 delete env.ENABLE_IMMUTABLE_DRAFTS;
 delete env.PRIVATE_DRAFT_KV;
 
+// Private publication plans are read-only, separately gated, and never approval to publish.
+assert.equal((await request("/api/publish/private-plan?revision="+("R".repeat(32)))).status,403);
+assert.equal((await worker.fetch(new Request(origin+"/api/publish/private-plan?revision="+("R".repeat(32))),env)).status,401);
+env.ENABLE_PRIVATE_PUBLISH_PLANS="true";
+assert.equal((await request("/api/publish/private-plan?revision="+("R".repeat(32)))).status,403);
+env.ENABLE_PRIVATE_STUDIO="true";
+env.ENABLE_IMMUTABLE_DRAFTS="true";
+assert.equal((await request("/api/publish/private-plan?revision=not-a-revision")).status,400);
+delete env.ENABLE_PRIVATE_PUBLISH_PLANS;
+delete env.ENABLE_PRIVATE_STUDIO;
+delete env.ENABLE_IMMUTABLE_DRAFTS;
 // Private editor must not be reachable before release flags, and never anonymously.
 assert.equal((await request("/studio/private")).status,403);
 assert.equal((await (await request("/api/session")).json()).canUseImmutableStudio,false);
