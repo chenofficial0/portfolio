@@ -217,7 +217,7 @@ saveButton.addEventListener("click",async()=>{
   if(!response.ok)throw Error(result.error||"儲存失敗");
   if(!result.ok||!result.revision?.id||result.published!==false||
      result.originalRevisionsPreserved!==true)throw Error("儲存回應格式不正確");
-  saveStatus.textContent="已另存全新草稿版本："+result.revision.id+"。正式網站未更新。";
+  saveStatus.textContent=(result.alreadySaved===true?"已確認先前儲存成功，無須建立重複版本：":"已另存全新草稿版本：")+result.revision.id+"。正式網站未更新。";
   confirmedPreview=null;
   saveButton.disabled=true;
  }catch(error){
