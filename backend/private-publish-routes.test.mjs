@@ -14,7 +14,7 @@ const files=Object.fromEntries(await Promise.all(EXPECTED_PUBLIC_ASSETS.map(asyn
  x.path,await readFile(path.join(root,x.path))
 ])));
 const revisionId="R".repeat(32),contentSha="c".repeat(40),baseHead="1".repeat(40),
- treeSha="2".repeat(40),newCommit="3".repeat(40);
+ treeSha="2".repeat(40),newCommit="3".repeat(40),rollbackCommit="5".repeat(40);
 const bundle=buildPrivateMigrationBundle(live,files,{id:revisionId});
 const origin="https://private-publish-test.invalid",cookies="chen_session=test-session";
 const kv=new Map();
@@ -30,7 +30,7 @@ const env={
  PUBLIC_API_ORIGIN:origin,GITHUB_CLIENT_ID:"MOCK_ID",SESSION_ENCRYPTION_KEY:Buffer.from(keyBytes).toString("base64"),
  ENABLE_DRAFT_SAVES:"true",ENABLE_LIVE_PUBLISH:"true",
  ENABLE_IMMUTABLE_DRAFTS:"true",ENABLE_PRIVATE_STUDIO:"true",ENABLE_PRIVATE_PUBLISH_PLANS:"true",
- ENABLE_PRIVATE_PUBLISH_CONFIRM:"true",
+ ENABLE_PRIVATE_PUBLISH_CONFIRM:"true",ENABLE_PRIVATE_ROLLBACK:"true",
  STUDIO_KV:{get:async k=>kv.get(k)??null,put:async(k,v)=>{kv.set(k,v)},delete:async k=>kv.delete(k)},
  PRIVATE_DRAFT_KV:{get:async(k,format)=>{
   if(k==="draft-revision-v1/"+revisionId)return bundle.recordText;
@@ -51,6 +51,10 @@ globalThis.fetch=async(url,options={})=>{
  if(u.pathname.endsWith("/git/ref/heads/main")&&(!options.method||options.method==="GET"))
   return response({object:{sha:head}});
  if(u.pathname.endsWith("/git/commits/"+baseHead))return response({tree:{sha:treeSha}});
+ if(u.pathname.endsWith("/git/commits/"+newCommit))return response({
+   tree:{sha:"4".repeat(40)},message:"Publish reviewed CHEN private revision "+revisionId,
+   parents:[{sha:baseHead}]
+ });
  if(u.pathname.includes("/contents/assets/uploads/")){
   const file=files[u.pathname.split("/contents/")[1]];
   return file?response({sha:gitSha(file)}):response({error:"missing"},404);
@@ -66,11 +70,16 @@ globalThis.fetch=async(url,options={})=>{
  }
  if(options.method==="POST"&&u.pathname.endsWith("/git/commits")){
   gitWrites++;const b=JSON.parse(options.body);
+  if(b.parents[0]===newCommit){
+   assert.equal(b.tree,treeSha);return response({sha:rollbackCommit});
+  }
   assert.deepEqual(b.parents,[baseHead]);return response({sha:newCommit});
  }
  if(options.method==="PATCH"&&u.pathname.endsWith("/git/refs/heads/main")){
-  const b=JSON.parse(options.body);assert.equal(b.force,false);assert.equal(b.sha,newCommit);
-  assert.equal(head,baseHead);head=newCommit;refUpdates++;return response({object:{sha:newCommit}});
+  const b=JSON.parse(options.body);assert.equal(b.force,false);
+  if(b.sha===newCommit){assert.equal(head,baseHead);head=newCommit;}
+  else{assert.equal(b.sha,rollbackCommit);assert.equal(head,newCommit);head=rollbackCommit;}
+  refUpdates++;return response({object:{sha:head}});
  }
  throw Error("UNEXPECTED_GITHUB_REQUEST_"+u.pathname+"_"+(options.method||"GET"));
 };
@@ -119,6 +128,26 @@ try{
  });
  assert.equal(retry.status,409);
  assert.equal(refUpdates,1);
+ const rollbackReview=await post("/api/publish/private-rollback-review",{
+  confirmation:"REVIEW_PUBLIC_SITE_ROLLBACK",publishedCommit:newCommit
+ });
+ assert.equal(rollbackReview.status,200,"rollback review failed "+await rollbackReview.clone().text());
+ const rollbackPlan=await rollbackReview.json();
+ assert.equal(rollbackPlan.previousPublicationHistoryMayRemainPublic,true);
+ assert.equal(rollbackPlan.publishedCommit,newCommit);
+ const rollback=await post("/api/publish/private-rollback-confirm",{
+  reviewId:rollbackPlan.reviewId,confirmation:"RESTORE_PREVIOUS_PUBLIC_SITE"
+ });
+ assert.equal(rollback.status,200,"rollback failed "+await rollback.clone().text());
+ const restored=await rollback.json();
+ assert.equal(restored.restored,true);
+ assert.equal(restored.commit,rollbackCommit);
+ assert.equal(refUpdates,2);
+ const rollbackRetry=await post("/api/publish/private-rollback-confirm",{
+  reviewId:rollbackPlan.reviewId,confirmation:"RESTORE_PREVIOUS_PUBLIC_SITE"
+ });
+ assert.equal(rollbackRetry.status,409);
+ assert.equal(refUpdates,2);
  env.ENABLE_PRIVATE_PUBLISH_CONFIRM="false";
  assert.equal((await post("/api/publish/private-review",{revisionId,confirmation:"REVIEW_PRIVATE_PUBLICATION"})).status,403);
  console.log("PASS: authenticated two-stage private release requires media disclosure, Origin, CSRF and prevents repeat commit.");
