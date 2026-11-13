@@ -166,13 +166,22 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
   const btn=(label,fn,cls="btn")=>{const b=el("button",cls,label);b.type="button";b.addEventListener("click",fn);return b};
   let data={about:{},profile:{},works:[],gallery:[],contact:{}}, current="dashboard", selected=null;
   const cloned=v=>JSON.parse(JSON.stringify(v));
-  const norm=d=>({
-    about:(d.about && typeof d.about==="object"&&!Array.isArray(d.about))?d.about:{},
-    profile:(d.profile && typeof d.profile==="object"&&!Array.isArray(d.profile))?d.profile:{},
-    works:Array.isArray(d.works)?d.works:[],
-    gallery:Array.isArray(d.gallery)?d.gallery:[],
-    contact:(d.contact && typeof d.contact==="object"&&!Array.isArray(d.contact))?d.contact:{}
-  });
+  const norm=d=>{
+    const about=(d.about && typeof d.about==="object"&&!Array.isArray(d.about))?{...d.about}:{};
+    // Keep older two-photo drafts usable, but do not retain obsolete references
+    // once the new list is present (even when it is intentionally empty).
+    if(Array.isArray(about.hero_images)){
+      delete about.hero_image;
+      delete about.hero_image_secondary;
+    }
+    return {
+      about,
+      profile:(d.profile && typeof d.profile==="object"&&!Array.isArray(d.profile))?d.profile:{},
+      works:Array.isArray(d.works)?d.works:[],
+      gallery:Array.isArray(d.gallery)?d.gallery:[],
+      contact:(d.contact && typeof d.contact==="object"&&!Array.isArray(d.contact))?d.contact:{}
+    };
+  };
   // Image input is local-preview only until an authenticated, tested upload endpoint is enabled.
   async function compressPhoto(file){
     if(!["image/jpeg","image/png","image/webp"].includes(file.type))throw Error("只支援 JPG、PNG、WebP");
@@ -329,6 +338,9 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     // Seamlessly keep legacy home portraits when switching to the gallery editor.
     if(!Array.isArray(about.hero_images)){
       about.hero_images=[about.hero_image,about.hero_image_secondary].filter(x=>typeof x==="string"&&x.trim()).map(image=>({image}));
+      delete about.hero_image;
+      delete about.hero_image_secondary;
+      markDirty();
     }
     const list=el("div","hero-photo-list-items");box.append(list);
     const draw=()=>{
