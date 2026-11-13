@@ -9,6 +9,7 @@ import {readPrivateDraft} from "./private-kv-draft.js";
 import {appendRevision,readRevision,validRevisionId} from "./private-kv-revisions.js";
 import {compareThreeWay} from "./private-kv-compare.js";
 import {previewConflictResolution} from "./private-kv-merge-preview.js";
+import {resolveSelectedMerge,saveReviewedMerge} from "./private-kv-merge-save.js";
 import {revisionComparisonHtml} from "./revision-compare-page.js";
 import {listDraftRevisions} from "./private-kv-revision-list.js";
 const REPO="chenofficial0/portfolio";
@@ -298,12 +299,34 @@ async function previewImmutableMerge(request,session,env){
   if(left.parentId!==base.id||right.parentId!==base.id)
     return fail("Revisions must share their direct parent",409);
   try{
-    const result=previewConflictResolution(base.data,left.data,right.data,input.decisions,validate);
-    return json({base:base.id,left:left.id,right:right.id,...result});
+    const result=await resolveSelectedMerge(env,input,validate);
+    return json({base:base.id,left:left.id,right:right.id,...result.preview,previewDigest:result.digest});
   }catch(err){
     if(["INVALID_MERGE_DECISION","INVALID_MERGE_DECISIONS","MERGE_RESULT_INVALID"].includes(err.message))
       return fail("Invalid or incomplete conflict resolution selection",422);
     return fail("Merge preview unavailable",503);
+  }
+}
+// Explicitly reviewed save creates a new immutable revision; default disabled.
+async function saveImmutableMerge(request,session,env){
+  if(env.ENABLE_MERGE_SAVES!=="true"||env.ENABLE_IMMUTABLE_DRAFTS!=="true"||
+     env.ENABLE_REVISION_COMPARISON!=="true")
+    return fail("Reviewed merge saves are not enabled",403);
+  if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
+  if(Number(request.headers.get("content-length")||0)>12000)return fail("Merge request too large",413);
+  const raw=await request.text();
+  if(raw.length>12000)return fail("Merge request too large",413);
+  let input;try{input=JSON.parse(raw)}catch(_){return fail("Invalid merge request",400)}
+  if(!input||input.confirmation!=="SAVE_MERGE_AS_NEW_REVISION")
+    return fail("Explicit merge save confirmation required",422);
+  try{return json(await saveReviewedMerge(env,input,validate),201)}
+  catch(err){
+    if(err.message==="MERGE_PREVIEW_CHANGED")return fail("Merge preview has changed; review again",409);
+    if(err.message==="MERGE_SOURCE_NOT_FOUND"||err.message==="MERGE_UNRELATED_REVISIONS")
+      return fail("Merge sources are missing or unrelated",409);
+    if(["MERGE_CONFIRMATION_REQUIRED","MERGE_CONFLICTS_UNRESOLVED","INVALID_MERGE_SELECTION","INVALID_MERGE_DECISION","MERGE_RESULT_INVALID","INVALID_MERGE_SOURCES"].includes(err.message))
+      return fail("Review all conflicts and confirm the exact preview",422);
+    return fail("Reviewed merge save unavailable",503);
   }
 }
 // New media stays in a private R2 bucket; absent binding must fail closed.
@@ -724,6 +747,10 @@ export default {
       if(method==="POST"&&path==="/api/draft/merge-preview"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return previewImmutableMerge(request,s,env);
+      }
+      if(method==="POST"&&path==="/api/draft/merge-save"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return saveImmutableMerge(request,s,env);
       }
       if(method==="POST"&&path==="/api/draft/revision"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
