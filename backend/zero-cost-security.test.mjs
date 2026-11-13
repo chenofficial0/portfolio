@@ -316,6 +316,19 @@ assert.equal((await request("/api/draft/revisions")).status,403);
 delete env.ENABLE_IMMUTABLE_DRAFTS;
 delete env.PRIVATE_DRAFT_KV;
 
+// Two-phase publication is unavailable until every independent release gate is enabled.
+const deniedReview=await request("/api/publish/private-review","POST",
+ {origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"},
+ JSON.stringify({revisionId:"R".repeat(32),confirmation:"REVIEW_PRIVATE_PUBLICATION"}));
+assert.equal(deniedReview.status,403);
+const deniedConfirm=await request("/api/publish/private-confirm","POST",
+ {origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"},
+ JSON.stringify({reviewId:"x".repeat(43),confirmation:"PUBLISH_APPROVED_PRIVATE_REVISION"}));
+assert.equal(deniedConfirm.status,403);
+assert.equal((await request("/api/publish/private-confirm","POST",
+ {origin:"https://evil.invalid","x-chen-csrf":"test-csrf-only"},"{}")).status,403);
+assert.equal((await worker.fetch(new Request(origin+"/api/publish/private-review",{method:"POST",
+ headers:{"origin":origin}}),env)).status,401);
 // Private publication plans are read-only, separately gated, and never approval to publish.
 assert.equal((await request("/api/publish/private-plan?revision="+("R".repeat(32)))).status,403);
 assert.equal((await worker.fetch(new Request(origin+"/api/publish/private-plan?revision="+("R".repeat(32))),env)).status,401);
