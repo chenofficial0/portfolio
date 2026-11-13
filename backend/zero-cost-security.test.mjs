@@ -71,4 +71,24 @@ assert.equal((await worker.fetch(new Request(origin + "/api/content"), env)).sta
 assert.equal((await worker.fetch(new Request(origin + "/api/preview-content"), env)).status, 401);
 assert.equal((await worker.fetch(new Request(origin + "/api/media/preview"), env)).status, 401);
 
+// Private KV media preview is read-only and authenticated; no public GitHub call.
+const image = new Uint8Array(100).fill(1);
+image.set([255, 216], 0); image.set([255, 217], 98);
+const privatePath = "private-kv/chen-hero-2026-11-13-abcdefghijklmnop.jpg";
+env.PRIVATE_DRAFT_KV = {
+  get: async (key, format) => key === privatePath && format === "arrayBuffer" ? image.slice().buffer : null,
+  put: async () => { throw Error("Read-only test must not write"); },
+  delete: async () => { throw Error("Read-only test must not delete"); }
+};
+const previewUrl = "/api/media/preview?path=" + encodeURIComponent(privatePath);
+const preview = await request(previewUrl);
+assert.equal(preview.status, 200);
+assert.equal(preview.headers.get("cache-control"), "private, no-store");
+assert.equal(preview.headers.get("content-type"), "image/jpeg");
+assert.deepEqual(new Uint8Array(await preview.arrayBuffer()), image);
+assert.equal((await worker.fetch(new Request(origin + previewUrl), env)).status, 401);
+assert.equal((await request("/api/media/preview?path=private-kv%2F..%2Fbad")).status, 400);
+delete env.PRIVATE_DRAFT_KV;
+assert.equal((await request(previewUrl)).status, 404);
+
 console.log("PASS: session flags, editor auth, wrong origin, missing CSRF, live publish disabled, media uploads disabled, anonymous reads denied.");
