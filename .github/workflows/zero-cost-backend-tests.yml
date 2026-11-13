@@ -60,6 +60,7 @@ jobs:
           node backend/private-revision-publish-plan.test.mjs
           node backend/private-revision-publish-transaction.test.mjs
           node backend/github-publish-adapter.test.mjs
+          node backend/private-publish-routes.test.mjs
 
   browser-smoke:
     runs-on: ubuntu-24.04
