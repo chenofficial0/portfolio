@@ -83,3 +83,11 @@ Cloudflare Workers KV Free: 1 GB total storage/account, 25 MiB maximum value, 10
 - GitHub Actions run status could not be independently confirmed through current connector results; treat tests as **NOT VERIFIED PASSED**. Inspect Actions results before merging.
 - Changed Worker `PUT /api/content` so `ENABLE_PRIVATE_DRAFTS=true` now refuses mutable private draft writes (HTTP 403) rather than using KV's non-atomic overwrite path. An immutable revision endpoint remains experimental and disabled.
 - Older `private-kv-draft.js` remains a non-live prototype for migration tests. It must NOT be promoted as concurrency-safe.
+
+## Draft comparison development (2026-11-13)
+- `backend/src/private-kv-compare.js` is a pure three-way JSON comparison module. It reports field changes as `left-only`, `right-only`, `same-change` or `conflict`; arrays (photos, filmography) are treated as indivisible because array index position is not a stable item identity.
+- `GET /api/draft/compare?base=...&left=...&right=...` requires an authenticated approved editor and both `ENABLE_IMMUTABLE_DRAFTS=true` and `ENABLE_REVISION_COMPARISON=true`, which remain **false** in the independent development branch.
+- The comparison accepts only two direct children of the same parent revision. It neither merges nor publishes anything.
+- Scalar preview text is truncated to 240 characters in the response; read-only API results are still private information and must never be cached publicly.
+- Next: explicit visual conflict selection UX and safe identity-based handling of filmography/gallery records. Never auto-merge arrays or release without acceptance.
+- CI includes `backend/private-kv-compare.test.mjs` and Worker-level authorized comparison regression cases. Review the run for the latest commit before calling it passed.
