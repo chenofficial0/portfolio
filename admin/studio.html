@@ -750,6 +750,97 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     window.open("/preview","_blank","noopener,noreferrer");
   });
   reviewButton.addEventListener("click",async()=>{
+    if(privateMode){
+      reviewPanel.hidden=false;
+      reviewPanel.replaceChildren(el("h2","","私人草稿正式發布檢查"));
+      if(!apiSession?.canReviewPrivatePublish||!privateRevisionId){
+        reviewPanel.append(el("p","","目前尚未開放私人草稿正式發布，或尚未選擇草稿版本。"));
+        return;
+      }
+      if(changed){
+        reviewPanel.append(el("p","","請先儲存目前編輯內容，再重新執行發布檢查。"));
+        return;
+      }
+      const approvedRevision=privateRevisionId;
+      try{
+        const plan=await privateFetch("/api/publish/private-plan?revision="+encodeURIComponent(approvedRevision));
+        if(!plan||plan.revisionId!==approvedRevision||plan.mayWrite!==false||
+           !Array.isArray(plan.media))
+          throw Error("發布檢查回應不完整");
+        reviewPanel.replaceChildren(el("h2","","私人草稿正式發布檢查"));
+        reviewPanel.append(el("p","","將發布指定版本："+approvedRevision+"。這會更新公開 GitHub Pages，不是私人預覽。"));
+        reviewPanel.append(el("p","","變更的區域："+(plan.changedSections.length?plan.changedSections.join("、"):"無")+"。"));
+        reviewPanel.append(el("p","","預計公開的私人檔案數："+plan.media.length+"。公開後即使復原頁面，檔案也可能仍留在 Git 歷史。"));
+        const list=el("div","release-media");
+        for(const entry of plan.media){
+          const fig=document.createElement("figure");
+          const title=el("figcaption","",entry.publicPath);
+          const item=entry.source;
+          const link=el("a","comp-card-button",item.endsWith(".pdf")?"檢視 PDF":"檢視私人照片");
+          link.href="/api/media/preview?path="+encodeURIComponent(item);
+          link.target="_blank";link.rel="noopener noreferrer";
+          fig.append(link,title);list.append(fig);
+        }
+        reviewPanel.append(list);
+        const goPreview=btn("預覽指定版本",()=>{
+          window.open("/preview/private?revision="+encodeURIComponent(approvedRevision),
+            "_blank","noopener,noreferrer");
+        });
+        const checkLabel=el("label","release-check");
+        const verified=document.createElement("input");
+        verified.type="checkbox";
+        checkLabel.append(verified,el("span","","我已檢查公開文字、照片、肖像與版權，並明白照片一旦公開可能留存在 Git 歷史。"));
+        reviewPanel.append(checkLabel);
+        const status=el("p","","此步驟尚未發布。送出發布審閱前，請先確認以上內容。");
+        reviewPanel.append(status);
+        const actions=el("div","toolbar");
+        actions.append(goPreview);
+        actions.append(btn("建立發布審閱單",async()=>{
+          if(!verified.checked)return alert("請先核對預覽並勾選公開內容確認。");
+          if(changed||privateRevisionId!==approvedRevision)
+            return alert("草稿版本或編輯內容已變更，請重新檢查。");
+          if(!confirm("確認為私人版本建立正式發布審閱單？此步驟尚未修改正式網站。"))return;
+          try{
+            const review=await privateFetch("/api/publish/private-review",{
+              method:"POST",headers:{"content-type":"application/json","x-chen-csrf":apiSession.csrf},
+              body:JSON.stringify({revisionId:approvedRevision,
+                confirmation:"REVIEW_PRIVATE_PUBLICATION"})
+            });
+            if(review.revisionId!==approvedRevision||!review.reviewId)
+              throw Error("無法確認發布審閱單");
+            status.textContent="已建立五分鐘有效的審閱單。最後確認才會實際修改正式網站。";
+            const finish=btn("最終確認並公開發布",async()=>{
+              if(!verified.checked||privateRevisionId!==approvedRevision||changed)
+                return alert("請重新檢查並確認指定草稿版本。");
+              if(!confirm("最後確認：這會將指定私人草稿及照片公開於正式 CHEN. 網站，可能永久留存在 Git 歷史。確定繼續？"))return;
+              const phrase=prompt("請輸入 PUBLISH APPROVED（含空格、英文大寫）確認公開：");
+              if(phrase!=="PUBLISH APPROVED")return;
+              finish.disabled=true;
+              try{
+                const saved=await privateFetch("/api/publish/private-confirm",{
+                  method:"POST",headers:{"content-type":"application/json",
+                    "x-chen-csrf":apiSession.csrf},
+                  body:JSON.stringify({reviewId:review.reviewId,
+                    confirmation:"PUBLISH_APPROVED_PRIVATE_REVISION",
+                    mediaConfirmation:review.willExposePrivateMedia?"I_APPROVE_PUBLIC_MEDIA":null})
+                });
+                if(saved.published!==true||!saved.commit)throw Error("未取得已確認的 GitHub 提交");
+                reviewPanel.replaceChildren(el("h2","","已提交正式網站更新"),
+                  el("p","","GitHub Commit："+saved.commit+"。請檢查正式網站是否完成更新。"));
+              }catch(err){
+                status.textContent="發布未確認："+err.message+"。請先檢查 GitHub main 的最新提交，不要直接重試。";
+              }
+            },"btn dark");
+            actions.append(finish);
+          }catch(err){status.textContent="審閱單建立失敗："+err.message}
+        },"btn dark"));
+        reviewPanel.append(actions);
+      }catch(err){
+        reviewPanel.replaceChildren(el("h2","","無法完成私人發布檢查"),el("p","",err.message));
+      }
+      return;
+    }
+
     approvedPlanId=null;reviewPanel.hidden=false;reviewPanel.replaceChildren();
     reviewPanel.append(el("h2","","發布前檢查"),el("p","","正在比對已儲存的 GitHub 草稿與正式網站…"));
     if(changed){reviewPanel.append(el("p","","你目前有尚未儲存的編輯內容。請先使用「儲存草稿」，再重新檢查。"));return}
@@ -819,7 +910,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
           apiSession=session;
           privateMode=session.canUseImmutableStudio===true;
           publish.hidden=!session.canSave&&!privateMode;
-          logout.hidden=false;previewButton.hidden=false;previewButton.disabled=privateMode;reviewButton.hidden=privateMode;
+          logout.hidden=false;previewButton.hidden=false;previewButton.disabled=privateMode;reviewButton.hidden=privateMode&&!session.canReviewPrivatePublish;
           notice.textContent="已透過 GitHub 登入："+session.login+"。"+(session.canSave?"已開放儲存至 GitHub 測試分支。新上傳照片需要已設定私人儲存空間，否則後端會拒絕上傳。":"目前為安全測試模式：尚未開放儲存草稿。可編輯及匯出 JSON 備份。");
           if(privateMode){
             publish.hidden=true;
