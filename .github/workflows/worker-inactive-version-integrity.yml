@@ -1,0 +1,28 @@
+name: CHEN Inactive Worker Version Integrity (Read Only)
+
+on:
+  push:
+    branches:
+      - feature/zero-cost-private-media
+    paths:
+      - "backend/TRIGGER_INACTIVE_WORKER_INTEGRITY.md"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-inactive-version:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax check
+        run: node --check backend/worker-inactive-version-integrity.mjs
+      - name: Verify inactive version flags and unchanged live traffic
+        env:
+          CLOUDFLARE_WORKER_EDITOR_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_EDITOR_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node backend/worker-inactive-version-integrity.mjs
