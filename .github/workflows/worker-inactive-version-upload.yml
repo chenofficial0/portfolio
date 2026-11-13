@@ -1,0 +1,40 @@
+name: CHEN Worker Version Upload (Not Deployed)
+
+# Explicit feature-branch trigger only. This uploads an inactive Worker version
+# and does NOT serve it to production traffic or publish website content.
+on:
+  push:
+    branches:
+      - feature/zero-cost-private-media
+    paths:
+      - "backend/TRIGGER_INACTIVE_WORKER_UPLOAD.md"
+
+permissions:
+  contents: read
+
+jobs:
+  upload-inactive-version:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout reviewed feature branch
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify release gates and backend security
+        run: |
+          node backend/phase15-acceptance.test.mjs
+          node backend/zero-cost-security.test.mjs
+          node backend/private-kv-migration-bundle.test.mjs
+          node --check backend/src/worker.js
+      - name: Bundle without deployment
+        run: npx --yes wrangler@4.47.0 deploy --dry-run --config backend/wrangler.toml --outdir /tmp/chen-inactive-worker
+      - name: Upload new inactive Worker version only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_EDITOR_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing scoped Worker Editor secret"; exit 2; }
+          npx --yes wrangler@4.47.0 versions upload --config backend/wrangler.toml --message "CHEN private draft staging, all private editing and publishing flags disabled"
