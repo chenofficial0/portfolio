@@ -211,6 +211,7 @@ const photoResult=await request("/api/draft/revision","POST",revisionHeaders,
   JSON.stringify({parentId:rootRevision.id,data:mediaDraft}));
 assert.equal(photoResult.status,201);
 const photoId=(await photoResult.json()).id;
+env.ENABLE_PRIVATE_STUDIO="true";
 const photoPreview=await request("/api/preview/private-content?revision="+photoId);
 assert.equal(photoPreview.status,200);
 const displayed=await photoPreview.json();
@@ -218,6 +219,7 @@ assert.equal(displayed.about.hero_images[0].image,
  "/api/media/preview?path="+encodeURIComponent(mediaDraft.about.hero_images[0].image));
 assert.equal(displayed.profile.photo,
  "/api/media/preview?path="+encodeURIComponent(mediaDraft.profile.photo));
+delete env.ENABLE_PRIVATE_STUDIO;
 
 const comparePath="/api/draft/compare?base="+rootRevision.id+"&left="+desktopId+"&right="+mobileId;
 const threeWayResponse=await request(comparePath);
