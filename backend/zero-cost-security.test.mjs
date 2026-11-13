@@ -71,6 +71,12 @@ assert.equal((await worker.fetch(new Request(origin + "/api/content"), env)).sta
 assert.equal((await worker.fetch(new Request(origin + "/api/preview-content"), env)).status, 401);
 assert.equal((await worker.fetch(new Request(origin + "/api/media/preview"), env)).status, 401);
 
+// Newly added KV uploads are disabled by default, even with an authenticated session.
+const deniedPrivateUpload = await request("/api/media/private", "POST",
+  {origin, "x-chen-csrf":"test-csrf-only", "content-type":"application/json"}, "{}");
+assert.equal(deniedPrivateUpload.status, 403);
+assert.match((await deniedPrivateUpload.json()).error, /disabled/i);
+
 // Deletion always fails closed until a separate opt-in flag is reviewed.
 const deniedDelete = await request("/api/media/private", "DELETE",
   { origin, "x-chen-csrf": "test-csrf-only", "content-type": "application/json" },
