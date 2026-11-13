@@ -725,7 +725,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
     if(!result.immutable||!result.data)throw Error("無法確認私人草稿版本");
     data=norm(result.data);privateRevisionId=id;contentSha=null;
     changed=false;document.title="CHEN. | Content Studio";
-    publish.hidden=false;publish.disabled=false;previewButton.disabled=false;
+    publish.hidden=apiSession?.canAppendImmutableDraft!==true;publish.disabled=false;previewButton.disabled=false;
     notice.textContent="已選擇私人草稿版本 "+id.slice(0,12)+"；儲存只會建立全新版本。";
     renderMain();
   }
@@ -935,6 +935,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
         if(session.authenticated){
           apiSession=session;
           privateMode=session.canUseImmutableStudio===true;
+          if(privateMode&&!session.canAppendImmutableDraft)publish.textContent="私人草稿唯讀模式";
           publish.hidden=!session.canSave&&!privateMode;
           logout.hidden=false;previewButton.hidden=false;previewButton.disabled=privateMode;reviewButton.hidden=privateMode&&!session.canReviewPrivatePublish;
           notice.textContent="已透過 GitHub 登入："+session.login+"。"+(session.canSave?"已開放儲存至 GitHub 測試分支。新上傳照片需要已設定私人儲存空間，否則後端會拒絕上傳。":"目前為安全測試模式：尚未開放儲存草稿。可編輯及匯出 JSON 備份。");
@@ -973,7 +974,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
   });
   publish.addEventListener("click",async()=>{
     if(privateMode){
-      if(!apiSession?.canUseImmutableStudio||!privateRevisionId)
+      if(!apiSession?.canUseImmutableStudio||!apiSession?.canAppendImmutableDraft||!privateRevisionId)
         return alert("請先選擇已遷移的私人草稿版本");
       if(!confirm("確定將修改另存全新私人草稿版本？原版本保留，正式網站不會更新。"))return;
       publish.disabled=true;publish.textContent="另存新版本…";
