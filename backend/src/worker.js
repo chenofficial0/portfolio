@@ -8,6 +8,7 @@ import {validPrivateRef,validatePrivateMedia,storePrivateMedia,readPrivateMedia,
 import {readPrivateDraft} from "./private-kv-draft.js";
 import {appendRevision,readRevision,validRevisionId} from "./private-kv-revisions.js";
 import {compareThreeWay} from "./private-kv-compare.js";
+import {revisionComparisonHtml} from "./revision-compare-page.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -661,6 +662,19 @@ export default {
       const s=await session(request,env);
       if(method==="GET"&&path==="/api/session")return json(s?{authenticated:true,login:s.login,csrf:s.csrf,canPublish:env.ENABLE_LIVE_PUBLISH==="true",canSave:env.ENABLE_DRAFT_SAVES==="true",canUpload:env.ENABLE_MEDIA_UPLOADS==="true"}:{authenticated:false,canPublish:false,canSave:false,canUpload:false});
       if(!s)return fail("Sign in with approved GitHub account",401);
+      if(method==="GET"&&path==="/studio/revisions"){
+        if(env.ENABLE_REVISION_COMPARISON!=="true"||env.ENABLE_IMMUTABLE_DRAFTS!=="true")
+          return fail("Private draft comparison page is not enabled",403);
+        const nonce=random();
+        return new Response(revisionComparisonHtml(nonce),{headers:{
+          "content-type":"text/html; charset=utf-8",
+          "cache-control":"private, no-store",
+          "x-frame-options":"DENY",
+          "x-content-type-options":"nosniff",
+          "referrer-policy":"no-referrer",
+          "content-security-policy":"default-src 'none'; script-src 'nonce-"+nonce+"'; style-src 'nonce-"+nonce+"'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'"
+        }});
+      }
       if(method==="GET"&&path==="/api/content")return getContent(s,env);
       if(method==="GET"&&path==="/api/draft/revision")return getImmutableDraftRevision(request,env);
       if(method==="GET"&&path==="/api/draft/compare")return compareImmutableDraftRevisions(request,env);
