@@ -14,6 +14,8 @@ import {revisionComparisonHtml} from "./revision-compare-page.js";
 import {listDraftRevisions} from "./private-kv-revision-list.js";
 import {auditPrivateNamespace} from "./private-kv-migration-audit.js";
 import {planPrivateRevisionPublish} from "./private-revision-publish-plan.js";
+import {prepareApprovedRelease,prepareRollback} from "./private-revision-publish-transaction.js";
+import {makeGitHubPublishAdapter} from "./github-publish-adapter.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -678,6 +680,98 @@ async function planImmutablePrivatePublish(request,session,env){
     return json({...summary,releaseEnabled:false});
   }catch(_){return fail("Private release plan rejected unreviewed content or media",422)}
 }
+// Two-phase private publication remains OFF until complete production acceptance.
+// Both requests require an authenticated approved editor and Origin/CSRF checks.
+function privateReleaseEnabled(env){
+ return env.ENABLE_PRIVATE_PUBLISH_CONFIRM==="true"&&
+        env.ENABLE_PRIVATE_PUBLISH_PLANS==="true"&&
+        env.ENABLE_IMMUTABLE_DRAFTS==="true"&&
+        env.ENABLE_PRIVATE_STUDIO==="true"&&env.ENABLE_LIVE_PUBLISH==="true";
+}
+async function beginPrivatePublishReview(request,editor,env){
+ if(!privateReleaseEnabled(env))return fail("Private publishing is locked",403);
+ if(request.headers.get("x-chen-csrf")!==editor.csrf)return fail("Invalid CSRF token",403);
+ if(Number(request.headers.get("content-length")||0)>4096)return fail("Review request too large",413);
+ let body;try{body=await request.json()}catch(_){return fail("Malformed review request",400)}
+ if(body?.confirmation!=="REVIEW_PRIVATE_PUBLICATION"||!validRevisionId(body.revisionId))
+   return fail("Explicit version selection required",422);
+ let rev,live,mainSha;
+ try{
+  [rev,live,mainSha]=await Promise.all([
+   readRevision(env,body.revisionId,{validate}),rawContent(editor,"main"),getGitHead(editor,"main")
+  ]);
+ }catch(_){return fail("Private version or live website unavailable",503)}
+ if(!rev||!live||!validate(live.data))return fail("Publication source unavailable",422);
+ let plan;
+ try{plan=await planPrivateRevisionPublish({
+  revisionId:body.revisionId,data:rev.data,liveData:live.data,validate
+ })}catch(_){return fail("Unreviewed or invalid private media",422)}
+ if(plan.media.length>50)return fail("Publication requires splitting media into batches",422);
+ // Verify all private images exist before issuing approval.
+ try{for(const image of plan.media){
+  if(!await readPrivateMedia(env,image.source))return fail("A reviewed photo is unavailable",422);
+ }}catch(_){return fail("Private photo data cannot be verified",503)}
+ const approvalId=random();
+ const key="private-release:"+await digest(approvalId);
+ await env.STUDIO_KV.put(key,JSON.stringify({
+  login:editor.login,revisionId:body.revisionId,
+  expectedMainSha:mainSha,sourceDigest:plan.sourceDigest,
+  publishedDigest:plan.publishedDigest,
+  exp:Date.now()+5*60*1000,
+  media:plan.media.map(item=>item.publicPath)
+ }),{expirationTtl:300});
+ return json({reviewId:approvalId,revisionId:body.revisionId,
+  expiresInSeconds:300,mainSha,changedSections:plan.changedSections,
+  proposedPublicMedia:plan.media.map(item=>item.publicPath),
+  willExposePrivateMedia:plan.willExposePrivateMedia,
+  confirmationRequired:"PUBLISH_APPROVED_PRIVATE_REVISION",
+  mediaConfirmationRequired:plan.willExposePrivateMedia?"I_APPROVE_PUBLIC_MEDIA":null,
+  published:false});
+}
+async function confirmPrivatePublish(request,editor,env){
+ if(!privateReleaseEnabled(env))return fail("Private publishing is locked",403);
+ if(request.headers.get("x-chen-csrf")!==editor.csrf)return fail("Invalid CSRF token",403);
+ if(Number(request.headers.get("content-length")||0)>4096)return fail("Confirmation too large",413);
+ let body;try{body=await request.json()}catch(_){return fail("Malformed confirmation request",400)}
+ if(body?.confirmation!=="PUBLISH_APPROVED_PRIVATE_REVISION"||
+    typeof body.reviewId!=="string"||body.reviewId.length<12||body.reviewId.length>100)
+  return fail("Explicit confirmation required",422);
+ const key="private-release:"+await digest(body.reviewId);
+ const raw=await env.STUDIO_KV.get(key);
+ if(!raw)return fail("Review unavailable or expired",409);
+ let approval;try{approval=JSON.parse(raw)}catch(_){return fail("Invalid review record",503)}
+ if(approval?.login!==editor.login||approval.exp<Date.now()||
+    !validRevisionId(approval.revisionId))
+  return fail("Review expired or unauthorized",403);
+ if(approval.media?.length>0&&body.mediaConfirmation!=="I_APPROVE_PUBLIC_MEDIA")
+  return fail("Confirm that private photographs become public before release",422);
+ // Delete approval before the first Git write; do not retry uncertain Git operations.
+ await env.STUDIO_KV.delete(key);
+ let revision,live;
+ try{
+  [revision,live]=await Promise.all([
+   readRevision(env,approval.revisionId,{validate}),rawContent(editor,"main")
+  ]);
+ }catch(_){return fail("Release source cannot be verified",503)}
+ if(!revision||!live||!validate(live.data))return fail("Release source unavailable",422);
+ try{
+  const result=await prepareApprovedRelease({
+   revisionId:approval.revisionId,data:revision.data,liveData:live.data,
+   validate,expectedSourceDigest:approval.sourceDigest,
+   expectedPublishedDigest:approval.publishedDigest,
+   expectedMainSha:approval.expectedMainSha,
+   confirmation:body.confirmation,
+   adapter:makeGitHubPublishAdapter(editor.token),
+   loadPrivateMedia:path=>readPrivateMedia(env,path)
+  });
+  // Only a successful branch update can be reported as published.
+  return json({ok:true,published:true,commit:result.commitSha,
+   previousCommit:result.parentSha,revisionId:result.revisionId,
+   publicMediaCount:result.mediaFiles});
+ }catch(_){
+  return fail("Release not confirmed; inspect GitHub main before any retry",409);
+ }
+}
 async function preparePublish(session,env){
   if(env.ENABLE_IMMUTABLE_DRAFTS==="true")return fail("Private revision release requires separate reviewed publish workflow",403);
   if(env.ENABLE_PRIVATE_DRAFTS==="true")return fail("Publishing private drafts is locked pending migration review",403);
@@ -857,6 +951,14 @@ export default {
       if(method==="GET"&&path==="/api/preview/private-content")return previewImmutableRevisionData(request,env);
       if(method==="GET"&&path==="/api/preview-content")return previewContent(s,env);
       if(method==="GET"&&path==="/api/publish/private-plan")return planImmutablePrivatePublish(request,s,env);
+      if(method==="POST"&&path==="/api/publish/private-review"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return beginPrivatePublishReview(request,s,env);
+      }
+      if(method==="POST"&&path==="/api/publish/private-confirm"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return confirmPrivatePublish(request,s,env);
+      }
       if(method==="GET"&&path==="/api/publish/plan")return preparePublish(s,env);
       if(method==="POST"&&path==="/api/publish/confirm"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
