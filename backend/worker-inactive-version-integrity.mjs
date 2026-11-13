@@ -5,7 +5,8 @@ const UPLOADED_ID="d27643da-8044-4861-b8c6-e55e14a6b28e";
 const PREVIOUS_ACTIVE_ID="da3650c4-7785-4e81-b5d6-71cb817e2da1";
 const requiredFlags=["ENABLE_CONTENT_WRITES","ENABLE_MEDIA_UPLOADS","ENABLE_LIVE_PUBLISH",
 "ENABLE_IMMUTABLE_DRAFTS","ENABLE_PRIVATE_STUDIO","ENABLE_MERGE_SAVES",
-"ENABLE_KV_MEDIA_UPLOADS","ENABLE_KV_MEDIA_DELETES"];
+"ENABLE_KV_MEDIA_UPLOADS","ENABLE_KV_MEDIA_DELETES","ENABLE_PRIVATE_DRAFTS",
+"ENABLE_REVISION_COMPARISON","ENABLE_MIGRATION_AUDIT"];
 const account=process.env.CLOUDFLARE_ACCOUNT_ID;
 const token=process.env.CLOUDFLARE_WORKER_EDITOR_TOKEN;
 async function cfGet(path){
@@ -39,6 +40,10 @@ try{
   console.log("Uploaded version bindings shape: "+(bindings===null?"null":Array.isArray(bindings)?"array":typeof bindings));
   throw Error("VERSION_BINDINGS_UNAVAILABLE");
  }
+ const names=new Set(bindings.map(item=>item?.name).filter(Boolean));
+ for(const key of ["GITHUB_CLIENT_SECRET","SESSION_ENCRYPTION_KEY"]){
+  if(!names.has(key))throw Error("REQUIRED_LOGIN_SECRET_BINDING_MISSING_"+key);
+ }
  const vars=new Map(),namespaces=new Map();
  for(const b of bindings){
   if(!b||typeof b!=="object")throw Error("MALFORMED_BINDING");
@@ -53,6 +58,7 @@ try{
   throw Error("NAMESPACE_BINDINGS_MISMATCH");
  console.log("PASS: inactive uploaded Worker version ID and disabled feature flags verified.");
  console.log("PASS: both KV bindings match their intended independent namespaces.");
+ console.log("PASS: required OAuth and session-secret binding names are present.");
  console.log("PASS: production traffic remains 100% on previous version; no new deployment.");
 }catch(err){
  console.error("BLOCKED: "+String(err.message).slice(0,120));
