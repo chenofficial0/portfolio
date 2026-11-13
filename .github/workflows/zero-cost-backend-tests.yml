@@ -61,6 +61,7 @@ jobs:
           node backend/private-revision-publish-transaction.test.mjs
           node backend/github-publish-adapter.test.mjs
           node backend/private-publish-routes.test.mjs
+          node backend/phase20-readonly-candidate.test.mjs
 
   browser-smoke:
     runs-on: ubuntu-24.04
@@ -107,3 +108,4 @@ jobs:
       - name: Bundle Worker with supplied KV binding (no deployment)
         run: |
           npx --yes wrangler@4.47.0 deploy --dry-run --config backend/wrangler.toml --outdir /tmp/chen-worker-dry-run
+          npx --yes wrangler@4.47.0 deploy --dry-run --config backend/wrangler-private-readonly.toml --outdir /tmp/chen-private-readonly-dry-run
