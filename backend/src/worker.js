@@ -553,12 +553,7 @@ async function getGitHead(session,branch){
   const ref=await github("/repos/"+REPO+"/git/ref/heads/"+encodeURIComponent(branch).replace(/%2F/gi,"/"),session.token);
   return ref.object.sha;
 }
-async function previewContent(session,env){
-  let draft;
-  if(env.ENABLE_PRIVATE_DRAFTS==="true"){
-    try{draft=await readPrivateDraft(env)}catch(_){return fail("Private draft storage unavailable",503)}
-  }else draft=await rawContent(session,CONTENT_BRANCH);
-  if(!draft||!validate(draft.data))return fail("Draft data is unavailable or invalid",422);
+function rewritePrivatePreviewData(draft){
   const data=JSON.parse(JSON.stringify(draft.data));
   const rewrite=value=>{
     const path=stagedPath(value);
@@ -582,7 +577,27 @@ async function previewContent(session,env){
     for(const st of w.stills||[])st.image=rewrite(st.image);
   }
   for(const g of data.gallery)g.image=rewrite(g.image);
-  return json(data);
+  return data;
+}
+
+async function previewContent(session,env){
+  let draft;
+  if(env.ENABLE_PRIVATE_DRAFTS==="true"){
+    try{draft=await readPrivateDraft(env)}catch(_){return fail("Private draft storage unavailable",503)}
+  }else draft=await rawContent(session,CONTENT_BRANCH);
+  if(!draft||!validate(draft.data))return fail("Draft data is unavailable or invalid",422);
+  return json(rewritePrivatePreviewData(draft));
+}
+async function previewImmutableRevisionData(request,env){
+  if(env.ENABLE_PRIVATE_STUDIO!=="true"||env.ENABLE_IMMUTABLE_DRAFTS!=="true")
+    return fail("Private version preview is disabled",403);
+  const revisionId=new URL(request.url).searchParams.get("revision");
+  if(!validRevisionId(revisionId))return fail("Invalid private preview revision",400);
+  try{
+    const record=await readRevision(env,revisionId,{validate});
+    if(!record)return fail("Private preview revision not found",404);
+    return json(rewritePrivatePreviewData(record));
+  }catch(_){return fail("Private preview data unavailable",503)}
 }
 async function previewSite(){
   const upstream=await fetch(PREVIEW_HTML,{headers:{"cache-control":"no-cache"}});
@@ -600,6 +615,37 @@ async function previewSite(){
   return new Response(html,{headers:{
     "content-type":"text/html; charset=utf-8","cache-control":"no-store",
     "x-frame-options":"DENY","x-content-type-options":"nosniff",
+    "content-security-policy":"default-src 'none'; script-src 'nonce-"+nonce+"'; style-src 'nonce-"+nonce+"'; style-src-attr 'unsafe-inline'; connect-src 'self'; img-src 'self' data: https:; font-src 'self'; frame-src https:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+  }});
+}
+async function previewImmutableRevisionSite(request,env){
+  if(env.ENABLE_PRIVATE_STUDIO!=="true"||env.ENABLE_IMMUTABLE_DRAFTS!=="true")
+    return fail("Private version preview is disabled",403);
+  const id=new URL(request.url).searchParams.get("revision");
+  if(!validRevisionId(id))return fail("Invalid private preview revision",400);
+  // Fail closed for a deleted or not-yet-replicated version before rendering HTML.
+  try{
+    const record=await readRevision(env,id,{validate});
+    if(!record)return fail("Private preview revision not found",404);
+  }catch(_){return fail("Private preview revision unavailable",503)}
+  const upstream=await fetch(PREVIEW_HTML,{headers:{"cache-control":"no-cache"}});
+  if(!upstream.ok)return fail("Public layout unavailable for private preview",503);
+  let html=await upstream.text();
+  const original="fetch(new URL('content/site.json',document.baseURI),{cache:'no-store'})";
+  if(!html.includes(original))return fail("Layout incompatible with private preview",503);
+  html=html.replace(original,
+    "fetch('/api/preview/private-content?revision="+encodeURIComponent(id)+
+    "',{cache:'no-store',credentials:'same-origin'})");
+  html=html.replace(/<meta name="robots" content="[^"]*">/,'<meta name="robots" content="noindex, nofollow">');
+  html=html.replace(/<link rel="canonical" href="[^"]*">/,"");
+  html=html.replace("<body>",
+    '<body><div role="status" style="padding:12px 24px;background:#f5f5f2;color:#333;font-size:12px;border-bottom:1px solid #ddd;position:relative;z-index:100">CHEN. / 私人版本預覽 — 尚未公開 <a href="/studio/private">返回編輯後台</a></div>');
+  const nonce=random();
+  html=html.replace(/<script(\s|>)/g,(_match,after)=>'<script nonce="'+nonce+'"'+after);
+  html=html.replace(/<style(\s|>)/g,(_match,after)=>'<style nonce="'+nonce+'"'+after);
+  return new Response(html,{headers:{
+    "content-type":"text/html; charset=utf-8","cache-control":"private, no-store",
+    "x-frame-options":"DENY","x-content-type-options":"nosniff","referrer-policy":"no-referrer",
     "content-security-policy":"default-src 'none'; script-src 'nonce-"+nonce+"'; style-src 'nonce-"+nonce+"'; style-src-attr 'unsafe-inline'; connect-src 'self'; img-src 'self' data: https:; font-src 'self'; frame-src https:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
   }});
 }
@@ -776,6 +822,8 @@ export default {
         return appendImmutableDraftRevision(request,s,env);
       }
       if(method==="GET"&&path==="/preview")return previewSite();
+      if(method==="GET"&&path==="/preview/private")return previewImmutableRevisionSite(request,env);
+      if(method==="GET"&&path==="/api/preview/private-content")return previewImmutableRevisionData(request,env);
       if(method==="GET"&&path==="/api/preview-content")return previewContent(s,env);
       if(method==="GET"&&path==="/api/publish/plan")return preparePublish(s,env);
       if(method==="POST"&&path==="/api/publish/confirm"){
