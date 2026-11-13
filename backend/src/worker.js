@@ -4,7 +4,7 @@
  * Publish only after registering a GitHub OAuth app, provisioning KV,
  * and setting Cloudflare Worker secrets documented in README.
  */
-import {validPrivateRef,readPrivateMedia,deletePrivateMedia,privateKv} from "./private-kv-media.js";
+import {validPrivateRef,validatePrivateMedia,storePrivateMedia,readPrivateMedia,deletePrivateMedia,privateKv} from "./private-kv-media.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -274,6 +274,52 @@ async function uploadResource(request,session,env){
     await bucket.put(path,bytes,{httpMetadata:{contentType:data.mime}});
     return json({ok:true,path,url:path,staging:true,private:true,mime:data.mime});
   }catch(_){return fail("Private document upload failed",502)}
+}
+// Separate private KV upload path; disabled unless BOTH explicit flags are enabled.
+// This KV inventory check is conservative, not an atomic concurrency-safe quota.
+async function uploadPrivateKvImage(request,editor,env){
+  if(env.ENABLE_MEDIA_UPLOADS!=="true"||env.ENABLE_KV_MEDIA_UPLOADS!=="true")
+    return fail("Private KV media uploads are disabled until acceptance",403);
+  if(request.headers.get("x-chen-csrf")!==editor.csrf)return fail("Invalid CSRF token",403);
+  const kv=privateKv(env);
+  if(!kv||typeof kv.list!=="function")return fail("Private KV inventory is not configured",503);
+  if(Number(request.headers.get("content-length")||0)>1450000)return fail("Photo exceeds upload limit",413);
+  const raw=await request.text();
+  if(raw.length>1450000)return fail("Photo exceeds upload limit",413);
+  let input;try{input=JSON.parse(raw)}catch(_){return fail("Invalid upload request",400)}
+  if(!input||!VALID_UPLOAD_SCOPES.has(input.scope)||input.mime!=="image/jpeg"||
+      typeof input.base64!=="string"||input.base64.length>1398104||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(input.base64))
+    return fail("Only JPEG photos up to 1 MiB are accepted",422);
+  let bytes;
+  try{bytes=Uint8Array.from(atob(input.base64),c=>c.charCodeAt(0))}
+  catch(_){return fail("Invalid photo encoding",422)}
+  const path="private-kv/chen-"+input.scope+"-"+new Date().toISOString().slice(0,10)+"-"+random().slice(0,16)+".jpg";
+  if(!validatePrivateMedia(path,bytes))return fail("Invalid JPEG or photo exceeds 1 MiB",422);
+  // Reject unknown inventory metadata, unbounded pagination, or budget exhaustion.
+  // Simultaneous requests can still race: this must be stress-tested before activation.
+  let entries=0,total=0,cursor;
+  try{
+    for(let page=0;page<3;page++){
+      const result=await kv.list({prefix:"private-kv/",limit:100,...(cursor?{cursor}:{})});
+      if(!result||!Array.isArray(result.keys))throw Error("Invalid inventory");
+      for(const item of result.keys){
+        const size=item?.metadata?.bytes;
+        if(!Number.isSafeInteger(size)||size<100||size>1048576)throw Error("Unverified media size");
+        total+=size;entries++;
+      }
+      if(result.list_complete===true){cursor=null;break}
+      if(!result.cursor||result.cursor===cursor)throw Error("Inventory pagination failed");
+      cursor=result.cursor;
+    }
+    if(cursor)throw Error("Inventory exceeds review limit");
+  }catch(_){return fail("Unable to verify private media inventory; upload blocked",503)}
+  if(entries>=50||total+bytes.byteLength>50*1048576)
+    return fail("Private media safety budget reached; upload blocked",413);
+  try{
+    await storePrivateMedia(env,path,bytes);
+    return json({ok:true,path,url:path,staging:true,private:true,mime:"image/jpeg"});
+  }catch(_){return fail("Private KV media upload unavailable",503)}
 }
 // Explicit deletion only. Never automatically delete an image merely because a draft reference was removed.
 async function deletePrivateKvAsset(request,editor,env){
@@ -556,6 +602,10 @@ export default {
         return confirmPublish(request,s,env);
       }
       if(method==="GET"&&path==="/api/media/preview")return previewStagedImage(request,s,env);
+      if(method==="POST"&&path==="/api/media/private"){
+        if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
+        return uploadPrivateKvImage(request,s,env);
+      }
       if(method==="DELETE"&&path==="/api/media/private"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
         return deletePrivateKvAsset(request,s,env);
