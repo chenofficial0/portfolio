@@ -115,3 +115,11 @@ Cloudflare Workers KV Free: 1 GB total storage/account, 25 MiB maximum value, 10
 - Added standalone and Worker-level tests for choices, unresolved conflicts, rejection of unknown fields, array/photo resolution, missing CSRF, and no storage changes.
 - Existing `ENABLE_IMMUTABLE_DRAFTS` and `ENABLE_REVISION_COMPARISON` remain false on the isolated branch; no production deployment or automatic migration.
 - Remaining: proper accessible revision review, browser QA, explicit merge-as-new-revision workflow, controlled retention/backup and data migration. Never automatically publish preview output.
+
+## Explicit reviewed merge save — development implementation (2026-11-13)
+- `backend/src/private-kv-merge-save.js` recomputes the three-way merged data from validated immutable base/left/right revisions and explicit A/B conflict decisions. The prior preview returns a SHA-256 `previewDigest` tied to source IDs, selections and merged content; save fails closed on mismatches.
+- `POST /api/draft/merge-save` requires approved authenticated editor, valid Origin, CSRF, `confirmation="SAVE_MERGE_AS_NEW_REVISION"`, and all three dedicated flags `ENABLE_IMMUTABLE_DRAFTS=true`, `ENABLE_REVISION_COMPARISON=true`, `ENABLE_MERGE_SAVES=true`. **`ENABLE_MERGE_SAVES` stays false** in isolated `wrangler.toml`.
+- Each reviewed merge is written as a new immutable draft key with `parentId=base` and `mergeSources={left,right}`; the three original versions are never deleted or overwritten. This operation never publishes any content.
+- `/studio/revisions` now conditionally reveals a separate confirmation button only when authenticated `/api/session` grants `canSaveMerge`; any changed source selection or conflict decision invalidates the preview.
+- Unit + Worker regression tests cover explicit confirmation, tampered digest rejection, no writes when flags are off, CSRF, preserved source revisions and merge provenance. GitHub Actions run `43384659536` for commit `6f8ab318` completed successfully.
+- Remaining risks: non-atomic KV quota and cross-region eventual consistency; no idempotent retry marker or transactional multi-writer merge coordination; user-facing browser tests and privacy-preserving migration have not been performed. **Do not enable** merge-save or deploy without separate acceptance.
