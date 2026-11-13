@@ -45,3 +45,4 @@ jobs:
           node backend/private-kv-merge-save.test.mjs
           node backend/migration-preflight.test.mjs
           node backend/zero-cost-security.test.mjs
+          node backend/phase15-acceptance.test.mjs
