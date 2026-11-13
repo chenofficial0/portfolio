@@ -951,7 +951,14 @@ export default {
     try{
       const url=new URL(request.url),path=url.pathname,method=request.method;
       absoluteBase(request,env);
-      if(method==="GET"&&path==="/studio")return studio(env);
+      if(method==="GET"&&path==="/studio"){
+        if(env.ENABLE_PRIVATE_STUDIO==="true"&&env.ENABLE_IMMUTABLE_DRAFTS==="true"&&
+           env.ENABLE_REVISION_COMPARISON==="true"&&env.ENABLE_DRAFT_SAVES==="true"){
+          const editor=await session(request,env);
+          return Response.redirect(env.PUBLIC_API_ORIGIN+(editor?"/studio/private":"/auth/login"),302);
+        }
+        return studio(env);
+      }
       if(method==="GET"&&path==="/studio/private"){
         if(env.ENABLE_PRIVATE_STUDIO!=="true"||env.ENABLE_IMMUTABLE_DRAFTS!=="true"||
            env.ENABLE_REVISION_COMPARISON!=="true"||env.ENABLE_DRAFT_SAVES!=="true")
