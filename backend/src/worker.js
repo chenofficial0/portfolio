@@ -179,6 +179,12 @@ async function saveContent(request,session,env){
   const raw=await request.text();if(raw.length>262144)return fail("Payload too large",413);
   let input;try{input=JSON.parse(raw)}catch(_){return fail("Invalid JSON")}
   if(!input||!safeString(input.sha,80)||!validate(input.data))return fail("Content validation failed",422);
+  // With the new gallery present, legacy hero fields must not leak into
+  // saved drafts or a future production publish.
+  if(Array.isArray(input.data.about.hero_images)){
+    delete input.data.about.hero_image;
+    delete input.data.about.hero_image_secondary;
+  }
   const encoded=b64(utf8.encode(JSON.stringify(input.data,null,2)+"\n"));
   try{
     const response=await github("/repos/"+REPO+"/contents/"+CONTENT_PATH,session.token,{
@@ -298,8 +304,12 @@ function stagedPath(value){
   return IMAGE_REF.test(path)||RESOURCE_REF.test(path)?path:null;
 }
 function imageRefs(d){
-  const images=[d.about?.hero_image,d.about?.hero_image_secondary,d.profile?.photo,d.profile?.model_card_pdf,d.profile?.resume_pdf,d.profile?.showreel_url];
-  for(const item of d.about?.hero_images||[])images.push(item.image);
+  // New-format galleries are authoritative, including an intentionally empty list.
+  // Fall back to the two legacy fields only for an older draft without hero_images.
+  const hero=Array.isArray(d.about?.hero_images)
+    ?d.about.hero_images.map(item=>item.image)
+    :[d.about?.hero_image,d.about?.hero_image_secondary];
+  const images=[...hero,d.profile?.photo,d.profile?.model_card_pdf,d.profile?.resume_pdf,d.profile?.showreel_url];
   for(const link of d.profile?.links||[])images.push(link.url);
   for(const w of d.works||[]){
     images.push(w.cover);
@@ -326,9 +336,14 @@ async function previewContent(session){
     const path=stagedPath(value);
     return path?"/api/media/preview?path="+encodeURIComponent(path):value;
   };
-  data.about.hero_image=rewrite(data.about.hero_image);
-  data.about.hero_image_secondary=rewrite(data.about.hero_image_secondary);
-  for(const item of data.about.hero_images||[])item.image=rewrite(item.image);
+  if(Array.isArray(data.about.hero_images)){
+    delete data.about.hero_image;
+    delete data.about.hero_image_secondary;
+    for(const item of data.about.hero_images)item.image=rewrite(item.image);
+  }else{
+    data.about.hero_image=rewrite(data.about.hero_image);
+    data.about.hero_image_secondary=rewrite(data.about.hero_image_secondary);
+  }
   data.profile.photo=rewrite(data.profile.photo);
   data.profile.model_card_pdf=rewrite(data.profile.model_card_pdf);
   data.profile.resume_pdf=rewrite(data.profile.resume_pdf);
@@ -366,6 +381,9 @@ async function preparePublish(session,env){
     getGitHead(session,CONTENT_BRANCH),getGitHead(session,"main")
   ]);
   if(!draft||!live||!validate(draft.data))return fail("Content validation failed; correct draft before publishing",422);
+  // Fail closed if an externally edited draft still has obsolete image URLs.
+  if(Array.isArray(draft.data.about.hero_images)&&(draft.data.about.hero_image||draft.data.about.hero_image_secondary))
+    return fail("Remove legacy hero photo fields from draft before publishing",422);
   const staged=imageRefs(draft.data);
   if(staged.length>120)return fail("Too many media files to publish at once",422);
   for(const path of staged){
@@ -399,6 +417,8 @@ async function confirmPublish(request,session,env){
   ]);
   if(mainHead!==plan.mainHead||stagingHead!==plan.stagingHead||draft?.sha!==plan.draftSha)return fail("Site or draft changed; review latest contents again",409);
   if(!validate(draft.data))return fail("Draft validation failed",422);
+  if(Array.isArray(draft.data.about.hero_images)&&(draft.data.about.hero_image||draft.data.about.hero_image_secondary))
+    return fail("Remove legacy hero photo fields before publishing",422);
   const refs=imageRefs(draft.data);
   if(refs.length!==plan.media.length||refs.some((p,i)=>p!==plan.media[i]))return fail("Image list changed; review again",409);
   const mainCommit=await github("/repos/"+REPO+"/git/commits/"+mainHead,session.token);
