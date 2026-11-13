@@ -119,6 +119,16 @@ delete env.ENABLE_PRIVATE_DRAFTS;
 // Explicitly enabled only inside isolated tests: origin and CSRF still block writes.
 env.ENABLE_IMMUTABLE_DRAFTS="true";
 assert.equal((await (await request("/api/session")).json()).canSave,false);
+assert.equal((await request("/api/content")).status,403);
+assert.equal((await request("/api/content","PUT",
+ {origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"},
+ JSON.stringify({sha:"0123456789012345678901234567890123456789",
+ data:{about:{},profile:{},contact:{},works:[],gallery:[]}}))).status,403);
+assert.equal((await request("/api/preview-content")).status,403);
+assert.equal((await request("/api/publish/plan")).status,403);
+assert.equal((await request("/api/publish/confirm","POST",
+ {origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"},
+ JSON.stringify({planId:"review-plan",confirmation:"PUBLISH"}))).status,403);
 assert.equal((await request("/api/draft/revision","POST",
   {origin,"content-type":"application/json"},
   JSON.stringify({parentId:null,data:{}}))).status,403);
