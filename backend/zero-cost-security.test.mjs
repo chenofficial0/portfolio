@@ -257,7 +257,14 @@ assert.equal(resultSave.ok,true);
 assert.equal(resultSave.published,false);
 assert.equal(resultSave.originalRevisionsPreserved,true);
 assert.equal(resultSave.revision.parentId,rootRevision.id);
-assert.equal(revisionRecords.size,countBeforeSave+1);
+assert.equal(revisionRecords.size,countBeforeSave+2);
+const retryResponse=await saveRequest({...reviewedMerge,previewDigest:previewHash,
+ confirmation:"SAVE_MERGE_AS_NEW_REVISION"});
+assert.equal(retryResponse.status,201);
+const retrySave=await retryResponse.json();
+assert.equal(retrySave.alreadySaved,true);
+assert.equal(retrySave.revision.id,resultSave.revision.id);
+assert.equal(revisionRecords.size,countBeforeSave+2);
 const storedMerge=(await (await request(revisionUrl(resultSave.revision.id))).json()).data;
 assert.equal(storedMerge.about.name_zh,"Desktop version");
 assert.deepEqual((await (await request(revisionUrl(rootRevision.id))).json()).data,validDraft);
