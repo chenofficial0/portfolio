@@ -177,6 +177,7 @@ async function callback(request,env){
   return r;
 }
 async function getContent(session,env){
+  if(env.ENABLE_IMMUTABLE_DRAFTS==="true")return fail("Use explicit immutable draft revisions instead of legacy content",403);
   if(env.ENABLE_PRIVATE_DRAFTS==="true"){
     try{
       const draft=await readPrivateDraft(env);
@@ -191,6 +192,7 @@ async function getContent(session,env){
   return json({data:JSON.parse(text),sha:raw.sha});
 }
 async function saveContent(request,session,env){
+  if(env.ENABLE_IMMUTABLE_DRAFTS==="true")return fail("Legacy GitHub content saves are disabled in immutable draft mode",403);
   if(env.ENABLE_DRAFT_SAVES!=="true")return fail("Draft saves are disabled until reviewed",403);
   if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
   const length=Number(request.headers.get("content-length")||0);
@@ -581,6 +583,7 @@ function rewritePrivatePreviewData(draft){
 }
 
 async function previewContent(session,env){
+  if(env.ENABLE_IMMUTABLE_DRAFTS==="true")return fail("Use version-pinned private previews",403);
   let draft;
   if(env.ENABLE_PRIVATE_DRAFTS==="true"){
     try{draft=await readPrivateDraft(env)}catch(_){return fail("Private draft storage unavailable",503)}
@@ -650,6 +653,7 @@ async function previewImmutableRevisionSite(request,env){
   }});
 }
 async function preparePublish(session,env){
+  if(env.ENABLE_IMMUTABLE_DRAFTS==="true")return fail("Private revision release requires separate reviewed publish workflow",403);
   if(env.ENABLE_PRIVATE_DRAFTS==="true")return fail("Publishing private drafts is locked pending migration review",403);
   const [draft,live,stagingHead,mainHead]=await Promise.all([
     rawContent(session,CONTENT_BRANCH),rawContent(session,"main"),
@@ -675,6 +679,7 @@ async function preparePublish(session,env){
     note:"Published files will be public. Review all photos and personal details before confirmation."});
 }
 async function confirmPublish(request,session,env){
+  if(env.ENABLE_IMMUTABLE_DRAFTS==="true")return fail("Private revision release remains disabled",403);
   if(env.ENABLE_PRIVATE_DRAFTS==="true")return fail("Private draft publishing is not enabled",403);
   if(env.ENABLE_LIVE_PUBLISH!=="true")return fail("Live publishing has not been approved or enabled",403);
   if(request.headers.get("x-chen-csrf")!==session.csrf)return fail("Invalid CSRF token",403);
