@@ -163,6 +163,20 @@ assert.deepEqual((await (await request(revisionUrl(desktopId))).json()).data,des
 assert.deepEqual((await (await request(revisionUrl(mobileId))).json()).data,mobile);
 assert.deepEqual((await (await request(revisionUrl(rootRevision.id))).json()).data,validDraft);
 assert.equal((await worker.fetch(new Request(origin+revisionUrl(rootRevision.id)),env)).status,401);
+env.ENABLE_REVISION_COMPARISON="true";
+const comparePath="/api/draft/compare?base="+rootRevision.id+"&left="+desktopId+"&right="+mobileId;
+const threeWayResponse=await request(comparePath);
+assert.equal(threeWayResponse.status,200);
+const diff=await threeWayResponse.json();
+assert.equal(diff.hasConflicts,true);
+assert.equal(diff.summary.conflict,1);
+assert.equal(diff.changes[0].path,"/about/name_zh");
+assert.equal(diff.automaticMergePerformed,false);
+assert.equal((await request("/api/draft/compare?base=bad&left=bad&right=bad")).status,400);
+assert.equal((await worker.fetch(new Request(origin+comparePath),env)).status,401);
+assert.equal((await request("/api/draft/compare?base="+desktopId+"&left="+rootRevision.id+"&right="+mobileId)).status,409);
+delete env.ENABLE_REVISION_COMPARISON;
+assert.equal((await request(comparePath)).status,403);
 delete env.ENABLE_IMMUTABLE_DRAFTS;
 delete env.PRIVATE_DRAFT_KV;
 
