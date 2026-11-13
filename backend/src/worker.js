@@ -9,6 +9,7 @@ import {readPrivateDraft} from "./private-kv-draft.js";
 import {appendRevision,readRevision,validRevisionId} from "./private-kv-revisions.js";
 import {compareThreeWay} from "./private-kv-compare.js";
 import {revisionComparisonHtml} from "./revision-compare-page.js";
+import {listDraftRevisions} from "./private-kv-revision-list.js";
 const REPO="chenofficial0/portfolio";
 const CONTENT_PATH="content/site.json";
 // Fail closed: this deployment must never write to the live Pages branch.
@@ -243,6 +244,17 @@ async function appendImmutableDraftRevision(request,session,env){
     if(err.message==="REVISION_TOO_LARGE")return fail("Draft exceeds storage limit",413);
     if(err.message==="PARENT_REVISION_UNAVAILABLE")return fail("Parent revision is unavailable; no data saved",409);
     return fail("Private revision storage unavailable",503);
+  }
+}
+// Read-only private revision list. No latest revision assumptions or public fallback.
+async function listImmutableDraftRevisions(request,env){
+  if(env.ENABLE_REVISION_COMPARISON!=="true"||env.ENABLE_IMMUTABLE_DRAFTS!=="true")
+    return fail("Private revision listing is not enabled",403);
+  const cursor=new URL(request.url).searchParams.get("cursor");
+  try{return json(await listDraftRevisions(env,{cursor,validate}))}
+  catch(err){
+    if(err.message==="INVALID_REVISION_CURSOR")return fail("Invalid revision list cursor",400);
+    return fail("Private revision listing unavailable; no public fallback",503);
   }
 }
 // Three-way comparison is read-only; never writes or selects a winning revision.
@@ -677,6 +689,7 @@ export default {
       }
       if(method==="GET"&&path==="/api/content")return getContent(s,env);
       if(method==="GET"&&path==="/api/draft/revision")return getImmutableDraftRevision(request,env);
+      if(method==="GET"&&path==="/api/draft/revisions")return listImmutableDraftRevisions(request,env);
       if(method==="GET"&&path==="/api/draft/compare")return compareImmutableDraftRevisions(request,env);
       if(method==="POST"&&path==="/api/draft/revision"){
         if(!requireWriteOrigin(request,env))return fail("Invalid origin",403);
