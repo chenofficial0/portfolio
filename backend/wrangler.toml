@@ -24,6 +24,7 @@ ENABLE_DRAFT_SAVES = "true"
 # Migration flags remain OFF until namespace access, data copy and release tests are verified.
 ENABLE_PRIVATE_DRAFTS = "false"
 ENABLE_IMMUTABLE_DRAFTS = "false"
+ENABLE_IMMUTABLE_DRAFT_WRITES = "false"
 ENABLE_REVISION_COMPARISON = "false"
 ENABLE_MERGE_SAVES = "false"
 ENABLE_MIGRATION_AUDIT = "false"
