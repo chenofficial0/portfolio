@@ -107,6 +107,7 @@ assert.equal((await request(previewUrl)).status, 404);
 
 // Opted-in private draft mode must NEVER fall back to public GitHub on missing storage.
 env.ENABLE_PRIVATE_DRAFTS = "true";
+assert.equal((await (await request("/api/session")).json()).canSave,false);
 assert.equal((await request("/api/content")).status, 503);
 assert.equal((await request("/api/preview-content")).status, 503);
 assert.equal((await request("/api/publish/plan")).status, 403);
@@ -117,6 +118,7 @@ assert.equal((await request("/api/content","PUT",
 delete env.ENABLE_PRIVATE_DRAFTS;
 // Explicitly enabled only inside isolated tests: origin and CSRF still block writes.
 env.ENABLE_IMMUTABLE_DRAFTS="true";
+assert.equal((await (await request("/api/session")).json()).canSave,false);
 assert.equal((await request("/api/draft/revision","POST",
   {origin,"content-type":"application/json"},
   JSON.stringify({parentId:null,data:{}}))).status,403);
