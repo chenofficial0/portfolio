@@ -199,6 +199,9 @@ async function saveContent(request,session,env){
     delete input.data.about.hero_image_secondary;
   }
   if(env.ENABLE_PRIVATE_DRAFTS==="true"){
+    // Mutable KV CAS is not atomic. Never allow this legacy write path to overwrite a private draft.
+    return fail("Mutable private draft writes are locked; use reviewed immutable revision workflow",403);
+    /* Archived migration prototype (deliberately unreachable):
     try{
       const result=await writePrivateDraft(env,{data:input.data,expectedSha:input.sha,validate});
       return json(result);
@@ -208,6 +211,7 @@ async function saveContent(request,session,env){
       if(err.message==="PRIVATE_DRAFT_INVALID")return fail("Invalid private draft",422);
       return fail("Private draft storage unavailable; no GitHub fallback",503);
     }
+    */
   }
   const encoded=b64(utf8.encode(JSON.stringify(input.data,null,2)+"\n"));
   try{
