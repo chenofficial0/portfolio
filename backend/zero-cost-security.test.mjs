@@ -115,6 +115,16 @@ assert.equal((await request("/api/publish/confirm","POST",
 assert.equal((await request("/api/content","PUT",
   {origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"},"{}")).status,422);
 delete env.ENABLE_PRIVATE_DRAFTS;
+// Explicitly enabled only inside isolated tests: origin and CSRF still block writes.
+env.ENABLE_IMMUTABLE_DRAFTS="true";
+assert.equal((await request("/api/draft/revision","POST",
+  {origin,"content-type":"application/json"},
+  JSON.stringify({parentId:null,data:{}}))).status,403);
+assert.equal((await request("/api/draft/revision","POST",
+  {origin:"https://untrusted.invalid","x-chen-csrf":"test-csrf-only"},
+  JSON.stringify({parentId:null,data:{}}))).status,403);
+assert.equal((await request("/api/draft/revision?id=bad")).status,400);
+delete env.ENABLE_IMMUTABLE_DRAFTS;
 
 // Immutable history has its own disabled-by-default gate.
 assert.equal((await request("/api/draft/revision?id=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")).status,403);
