@@ -157,6 +157,12 @@ env.PRIVATE_DRAFT_KV={
 };
 env.ENABLE_IMMUTABLE_DRAFTS="true";
 const validDraft={about:{},profile:{},contact:{},works:[],gallery:[]};
+const readonlyRevisionRequest=await request("/api/draft/revision","POST",
+ {origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"},
+ JSON.stringify({parentId:null,data:validDraft}));
+assert.equal(readonlyRevisionRequest.status,403,"Read-only private Studio must never append a revision");
+assert.equal(revisionRecords.size,0);
+env.ENABLE_IMMUTABLE_DRAFT_WRITES="true";
 const revisionHeaders={origin,"x-chen-csrf":"test-csrf-only","content-type":"application/json"};
 const rootResult=await request("/api/draft/revision","POST",revisionHeaders,
   JSON.stringify({parentId:null,data:validDraft}));
