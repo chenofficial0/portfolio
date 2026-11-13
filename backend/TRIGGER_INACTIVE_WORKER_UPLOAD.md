@@ -12,3 +12,11 @@ deploying traffic, merging main, changing runtime feature flags,
 deleting photos or drafts, publishing the public site.
 
 All experimental private storage, media writes and publishing flags remain OFF.
+
+## Second upload authorization — latest private publication/rollback build
+- Date: 2026-11-13
+- Tested rehearsal: https://github.com/chenofficial0/portfolio/actions/runs/43411875977
+- Complete regression: https://github.com/chenofficial0/portfolio/actions/runs/43411875817
+- Upload a new **inactive** Worker version only using already-scoped Worker Editor token.
+- All private publishing and rollout flags remain false. Do not deploy or change traffic.
+- Prior inactive version v84 remains available; do not retry the original partial upload.
