@@ -1,7 +1,6 @@
 // CHEN. private KV media adapter (development only; not wired to production).
 // The caller MUST authenticate/authorize the editor and verify Origin + CSRF for mutations.
 // KV is eventually consistent; this adapter does not promise instant deletion or atomic quotas.
-const PREFIX = "private-kv/";
 const REF = /^private-kv\/chen-(?:hero|profile|gallery|work-cover|work-still|resource)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.(?:jpg|png|pdf)$/;
 const MAX_IMAGE_BYTES = 1048576; // 1 MiB processed image
 const MAX_DOCUMENT_BYTES = 1048576; // 1 MiB, to keep a strict no-cost staging budget
@@ -45,7 +44,7 @@ export async function storePrivateMedia(env, path, data) {
   if (!kv) throw new Error("PRIVATE_STORAGE_UNAVAILABLE");
   if (!validatePrivateMedia(path, data)) throw new Error("INVALID_PRIVATE_MEDIA");
   // A separate manifest/quota accounting step is required before enabling production writes.
-  await kv.put(path, data);
+  await kv.put(path, data.slice().buffer);
   return { path, mime: mimeForPrivateMedia(path), bytes: data.byteLength };
 }
 export async function readPrivateMedia(env, path) {
