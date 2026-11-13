@@ -12,8 +12,12 @@ id = "f5115459b9a0488186850f92f1ee8cfc"
 [vars]
 # Only GitHub staging branch draft writes are allowed. The public website remains unchanged.
 ENABLE_CONTENT_WRITES = "false"
-ENABLE_MEDIA_UPLOADS = "true"
+ENABLE_MEDIA_UPLOADS = "false"
 ENABLE_DRAFT_SAVES = "true"
+# Migration flags remain OFF until private KV namespace is provisioned, data copied and tests pass.
+ENABLE_PRIVATE_DRAFTS = "false"
+ENABLE_KV_MEDIA_UPLOADS = "false"
+ENABLE_KV_MEDIA_DELETES = "false"
 # Release remains locked until staging preview and publish workflow pass acceptance checks.
 ENABLE_LIVE_PUBLISH = "false"
 # Must match the exact deployed API origin, e.g. https://chen-content-studio-api.YOUR-SUBDOMAIN.workers.dev
