@@ -1,0 +1,29 @@
+name: CHEN Cloudflare KV Read-Only Verification
+
+# Manual trigger only. NEVER deploys, writes a KV key or changes a Worker.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-private-namespace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify no deployment commands are part of remote audit
+        run: |
+          node --check backend/src/cloudflare-remote-kv-audit.js
+          node backend/cloudflare-remote-kv-audit.test.mjs
+      - name: Verify dedicated Cloudflare KV namespace via read-only API
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KV_READ_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node backend/phase17-remote-kv-audit.mjs
