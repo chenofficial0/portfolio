@@ -230,6 +230,7 @@ footer{border-top:1px solid var(--line);padding-top:27px;font-size:10px;color:#9
   function stagedImagePreviewURL(url){
     if(!isWorkerHost||!apiSession||typeof url!=="string")return "";
     if(/^private-media\/chen-(?:hero|profile|gallery|work-cover|work-still|resource)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.(?:jpg|png|pdf)$/.test(url))return "/api/media/preview?path="+encodeURIComponent(url);
+    if(/^private-kv\/chen-(?:hero|profile|gallery|work-cover|work-still|resource)-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{16}\.(?:jpg|png|pdf)$/.test(url))return "/api/media/preview?path="+encodeURIComponent(url);
     try{
       const parsed=new URL(url);
       if(parsed.hostname!=="chenofficial0.github.io")return "";
