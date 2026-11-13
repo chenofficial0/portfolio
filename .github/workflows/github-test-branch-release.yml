@@ -1,0 +1,34 @@
+name: CHEN Real GitHub Release & Rollback Rehearsal (Test Branch Only)
+
+on:
+  push:
+    branches:
+      - feature/zero-cost-private-media
+    paths:
+      - "backend/TRIGGER_GITHUB_TEST_BRANCH_RELEASE.md"
+
+permissions:
+  contents: write
+
+jobs:
+  isolated-publish-and-restore:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout isolated development branch
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify exact source and safe transaction code
+        run: |
+          node backend/private-kv-migration-bundle.test.mjs
+          node backend/private-revision-publish-transaction.test.mjs
+          node backend/github-publish-adapter.test.mjs
+          node --check backend/real-github-branch-publish-rehearsal.mjs
+      - name: Publish and rollback only on dedicated test branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHEN_TEST_BRANCH_ONLY: "YES"
+        run: node backend/real-github-branch-publish-rehearsal.mjs
